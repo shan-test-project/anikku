@@ -156,8 +156,8 @@ private data class ALAiringSchedule(
 @Serializable
 private data class ALMedia(
     val id: Int,
-    val title: ALTitle,
-    val coverImage: ALCoverImage,
+    val title: ALTitle? = null,
+    val coverImage: ALCoverImage? = null,
     val episodes: Int? = null,
     val status: String? = null,
     val averageScore: Int? = null,
