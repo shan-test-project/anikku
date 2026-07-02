@@ -1,11 +1,14 @@
 package mihon.feature.airingschedule
 
+import android.content.Context
 import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import mihon.feature.airingschedule.components.BellNotifyState
+import mihon.feature.airingschedule.notification.ScheduleNotifications
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.time.DayOfWeek
@@ -91,11 +94,6 @@ class AiringScheduleScreenModel : StateScreenModel<AiringScheduleScreenModel.Sta
         val zone = ZoneId.systemDefault()
 
         val filtered = entries.filter { entry ->
-            // filterByAvailability: only show episodes that have already aired,
-            // giving sources time to upload the episode.
-            // showOnlyFavoriteSources: requires per-entry source membership data which
-            // is not available from AniList; treated as a UI pass-through until
-            // library/source integration provides that linkage.
             !filterByAvailability || entry.hasAired()
         }
 
@@ -124,7 +122,76 @@ class AiringScheduleScreenModel : StateScreenModel<AiringScheduleScreenModel.Sta
                 titleLanguage = titleLang,
                 sourceDelays = delays,
                 favoriteSourceIds = favoriteIds,
+                bellStates = computeBellStates(entries),
             )
+        }
+    }
+
+    private fun computeBellStates(entries: List<AiringScheduleEntry> = allEntries): Map<Int, BellNotifyState> {
+        val seriesIds = schedulePrefs.scheduledSeriesMediaIds().get()
+        val alarmKeys = schedulePrefs.scheduledAlarmKeys().get()
+        return entries.associate { e ->
+            e.scheduleId to when {
+                e.mediaId.toString() in seriesIds -> BellNotifyState.SERIES
+                ScheduleNotifications.alarmKey(e.mediaId, e.episode) in alarmKeys -> BellNotifyState.ONCE
+                else -> BellNotifyState.NONE
+            }
+        }
+    }
+
+    private fun refreshBellStates() {
+        mutableState.update { it.copy(bellStates = computeBellStates()) }
+    }
+
+    fun toggleBellTap(context: Context, entry: AiringScheduleEntry) {
+        val current = computeBellStateFor(entry)
+        when (current) {
+            BellNotifyState.NONE -> {
+                ScheduleNotifications.ensureScheduled(context, entry)
+            }
+            BellNotifyState.ONCE -> {
+                ScheduleNotifications.cancel(context, entry)
+            }
+            BellNotifyState.SERIES -> {
+                schedulePrefs.scheduledSeriesMediaIds().set(
+                    schedulePrefs.scheduledSeriesMediaIds().get() - entry.mediaId.toString(),
+                )
+                ScheduleNotifications.cancelAllForMedia(context, entry.mediaId, allEntries)
+                ScheduleNotifications.ensureScheduled(context, entry)
+            }
+        }
+        refreshBellStates()
+    }
+
+    fun toggleBellLongPress(context: Context, entry: AiringScheduleEntry) {
+        val current = computeBellStateFor(entry)
+        if (current == BellNotifyState.SERIES) {
+            schedulePrefs.scheduledSeriesMediaIds().set(
+                schedulePrefs.scheduledSeriesMediaIds().get() - entry.mediaId.toString(),
+            )
+            ScheduleNotifications.cancelAllForMedia(context, entry.mediaId, allEntries)
+        } else {
+            if (current == BellNotifyState.ONCE) {
+                ScheduleNotifications.cancel(context, entry)
+            }
+            schedulePrefs.scheduledSeriesMediaIds().set(
+                schedulePrefs.scheduledSeriesMediaIds().get() + entry.mediaId.toString(),
+            )
+            allEntries.filter { it.mediaId == entry.mediaId && !it.hasAired() }.forEach { e ->
+                ScheduleNotifications.ensureScheduled(context, e)
+            }
+        }
+        refreshBellStates()
+    }
+
+    private fun computeBellStateFor(entry: AiringScheduleEntry): BellNotifyState {
+        val seriesIds = schedulePrefs.scheduledSeriesMediaIds().get()
+        if (entry.mediaId.toString() in seriesIds) return BellNotifyState.SERIES
+        val alarmKeys = schedulePrefs.scheduledAlarmKeys().get()
+        return if (ScheduleNotifications.alarmKey(entry.mediaId, entry.episode) in alarmKeys) {
+            BellNotifyState.ONCE
+        } else {
+            BellNotifyState.NONE
         }
     }
 
@@ -147,5 +214,6 @@ class AiringScheduleScreenModel : StateScreenModel<AiringScheduleScreenModel.Sta
         val titleLanguage: SchedulePreferences.TitleLanguage = SchedulePreferences.TitleLanguage.USER_PREFERRED,
         val sourceDelays: Map<String, Long> = emptyMap(),
         val favoriteSourceIds: Set<String> = emptySet(),
+        val bellStates: Map<Int, BellNotifyState> = emptyMap(),
     )
 }
