@@ -39,8 +39,11 @@ import mihon.feature.airingschedule.UploadDelayTracker
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
+import java.util.Locale
 
-private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+private val timeFormatter: DateTimeFormatter =
+    DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(Locale.getDefault())
 
 @Composable
 fun ScheduleAnimeCard(
@@ -48,7 +51,11 @@ fun ScheduleAnimeCard(
     titleLanguage: SchedulePreferences.TitleLanguage,
     sourceDelays: Map<String, Long>,
     favoriteSourceIds: Set<String>,
+    bellState: BellNotifyState,
+    onBellTap: () -> Unit,
+    onBellLongPress: () -> Unit,
     onSearchClick: (String) -> Unit,
+    onBookmarkClick: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val zone = ZoneId.systemDefault()
@@ -67,6 +74,18 @@ fun ScheduleAnimeCard(
         Instant.ofEpochSecond(UploadDelayTracker.adjustedAirTime(entry.airingAt, it))
             .atZone(zone)
             .format(timeFormatter)
+    }
+
+    val countdown: String? = if (!hasAired) {
+        val nowSec = System.currentTimeMillis() / 1000L
+        val rem = entry.airingAt - nowSec
+        when {
+            rem <= 0 -> null
+            rem < 3600 -> "in ${rem / 60}m"
+            else -> "in ${rem / 3600}h ${(rem % 3600) / 60}m"
+        }
+    } else {
+        null
     }
 
     Surface(
@@ -90,6 +109,7 @@ fun ScheduleAnimeCard(
                 officialAirTime = officialAirTime,
                 hasAired = hasAired,
                 expectedUploadTime = expectedUploadTime,
+                countdown = countdown,
                 entry = entry,
                 modifier = Modifier.weight(1f),
             )
@@ -97,7 +117,11 @@ fun ScheduleAnimeCard(
             AnimeCardActions(
                 hasAired = hasAired,
                 displayTitle = displayTitle,
+                bellState = bellState,
+                onBellTap = onBellTap,
+                onBellLongPress = onBellLongPress,
                 onSearchClick = onSearchClick,
+                onBookmarkClick = onBookmarkClick,
             )
         }
     }
@@ -139,6 +163,7 @@ private fun AnimeCardInfo(
     officialAirTime: String,
     hasAired: Boolean,
     expectedUploadTime: String?,
+    countdown: String?,
     entry: AiringScheduleEntry,
     modifier: Modifier = Modifier,
 ) {
@@ -158,6 +183,7 @@ private fun AnimeCardInfo(
             officialAirTime = officialAirTime,
             hasAired = hasAired,
             expectedUploadTime = expectedUploadTime,
+            countdown = countdown,
             episode = entry.episode,
             totalEpisodes = entry.totalEpisodes,
         )
@@ -171,6 +197,7 @@ private fun AnimeCardTimingRow(
     officialAirTime: String,
     hasAired: Boolean,
     expectedUploadTime: String?,
+    countdown: String?,
     episode: Int,
     totalEpisodes: Int?,
 ) {
@@ -188,6 +215,13 @@ private fun AnimeCardTimingRow(
                 fontWeight = FontWeight.Bold,
                 color = if (hasAired) MaterialTheme.colorScheme.onTertiary else MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            )
+        }
+        if (countdown != null) {
+            Text(
+                text = countdown,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         if (expectedUploadTime != null && expectedUploadTime != officialAirTime) {
@@ -250,7 +284,11 @@ private fun AnimeCardMetaRow(format: String?, averageScore: Int?) {
 private fun AnimeCardActions(
     hasAired: Boolean,
     displayTitle: String,
+    bellState: BellNotifyState,
+    onBellTap: () -> Unit,
+    onBellLongPress: () -> Unit,
     onSearchClick: (String) -> Unit,
+    onBookmarkClick: (String) -> Unit,
 ) {
     Column(
         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -267,7 +305,7 @@ private fun AnimeCardActions(
             )
         }
         IconButton(
-            onClick = { onSearchClick(displayTitle) },
+            onClick = { onBookmarkClick(displayTitle) },
             modifier = Modifier.size(36.dp),
         ) {
             Icon(
@@ -277,5 +315,10 @@ private fun AnimeCardActions(
                 tint = MaterialTheme.colorScheme.primary,
             )
         }
+        EpisodeBell(
+            state = bellState,
+            onTap = onBellTap,
+            onLongPress = onBellLongPress,
+        )
     }
 }
