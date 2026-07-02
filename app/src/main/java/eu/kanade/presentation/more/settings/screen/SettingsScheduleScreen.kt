@@ -11,6 +11,7 @@ import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableMap
 import mihon.feature.airingschedule.SchedulePreferences
 import tachiyomi.i18n.MR
+import tachiyomi.i18n.ank.AMR
 import tachiyomi.presentation.core.i18n.stringResource
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
@@ -38,24 +39,24 @@ object SettingsScheduleScreen : SearchableSettings {
         }
 
         val titleLanguageOptions = mapOf(
-            SchedulePreferences.TitleLanguage.USER_PREFERRED to "User Preferred (AniList default)",
-            SchedulePreferences.TitleLanguage.ENGLISH to "English",
-            SchedulePreferences.TitleLanguage.ROMAJI to "Romaji",
-            SchedulePreferences.TitleLanguage.NATIVE to "Native",
+            SchedulePreferences.TitleLanguage.USER_PREFERRED to stringResource(AMR.strings.pref_schedule_lang_user_preferred),
+            SchedulePreferences.TitleLanguage.ENGLISH to stringResource(AMR.strings.pref_schedule_lang_english),
+            SchedulePreferences.TitleLanguage.ROMAJI to stringResource(AMR.strings.pref_schedule_lang_romaji),
+            SchedulePreferences.TitleLanguage.NATIVE to stringResource(AMR.strings.pref_schedule_lang_native),
         ).toImmutableMap()
 
         val intervalOptions = mapOf(
-            SchedulePreferences.UploadDelayInterval.THIRTY_MIN to "Every 30 minutes",
-            SchedulePreferences.UploadDelayInterval.ONE_HOUR to "Every 1 hour",
-            SchedulePreferences.UploadDelayInterval.TWO_HOURS to "Every 2 hours",
-            SchedulePreferences.UploadDelayInterval.SIX_HOURS to "Every 6 hours",
-            SchedulePreferences.UploadDelayInterval.TWELVE_HOURS to "Every 12 hours",
-            SchedulePreferences.UploadDelayInterval.NEVER to "Never (manual only)",
+            SchedulePreferences.UploadDelayInterval.THIRTY_MIN to stringResource(AMR.strings.pref_schedule_interval_30min),
+            SchedulePreferences.UploadDelayInterval.ONE_HOUR to stringResource(AMR.strings.pref_schedule_interval_1h),
+            SchedulePreferences.UploadDelayInterval.TWO_HOURS to stringResource(AMR.strings.pref_schedule_interval_2h),
+            SchedulePreferences.UploadDelayInterval.SIX_HOURS to stringResource(AMR.strings.pref_schedule_interval_6h),
+            SchedulePreferences.UploadDelayInterval.TWELVE_HOURS to stringResource(AMR.strings.pref_schedule_interval_12h),
+            SchedulePreferences.UploadDelayInterval.NEVER to stringResource(AMR.strings.pref_schedule_interval_never),
         ).toImmutableMap()
 
         return listOf(
             Preference.PreferenceGroup(
-                title = "Favorite Sources",
+                title = stringResource(MR.strings.pref_schedule_sources_title),
                 preferenceItems = persistentListOf(
                     Preference.PreferenceItem.MultiSelectListPreference(
                         pref = schedulePreferences.favoriteSourceIds(),
@@ -70,45 +71,45 @@ object SettingsScheduleScreen : SearchableSettings {
                     ),
                     Preference.PreferenceItem.SwitchPreference(
                         pref = schedulePreferences.filterBySourceAvailability(),
-                        title = "Filter by source availability",
-                        subtitle = "Only show anime that your selected favorite sources are likely to carry",
+                        title = stringResource(AMR.strings.pref_schedule_filter_availability),
+                        subtitle = stringResource(AMR.strings.pref_schedule_filter_availability_summary),
                     ),
                     Preference.PreferenceItem.SwitchPreference(
                         pref = schedulePreferences.autoAddViaPinnedSources(),
-                        title = "Auto-add via pinned sources",
-                        subtitle = "When tapping the bookmark button, search only in your pinned sources (from Browse) using priority order \u2014 1st pinned gets highest priority",
+                        title = stringResource(AMR.strings.pref_schedule_auto_add_pinned),
+                        subtitle = stringResource(AMR.strings.pref_schedule_auto_add_pinned_summary),
                     ),
                 ),
             ),
             Preference.PreferenceGroup(
-                title = "Upload Delay Tracking",
+                title = stringResource(AMR.strings.pref_schedule_upload_delay_group),
                 preferenceItems = persistentListOf(
                     Preference.PreferenceItem.SwitchPreference(
                         pref = schedulePreferences.uploadDelayEnabled(),
-                        title = "Auto-sync source upload time",
-                        subtitle = "Learn how long after the official air time each pinned source uploads episodes, then show estimated availability time. Priority: 1st pinned source \u2192 2nd \u2192 etc.",
+                        title = stringResource(AMR.strings.pref_schedule_upload_delay_enabled),
+                        subtitle = stringResource(AMR.strings.pref_schedule_upload_delay_enabled_summary),
                     ),
                     Preference.PreferenceItem.ListPreference(
                         pref = schedulePreferences.uploadDelayRefreshInterval(),
-                        title = "Refresh interval",
-                        subtitle = "How often to check sources for new episodes. Once a delay is learned it is cached \u2014 checking stops until the interval elapses",
+                        title = stringResource(AMR.strings.pref_schedule_refresh_interval),
+                        subtitle = stringResource(AMR.strings.pref_schedule_refresh_interval_summary),
                         entries = intervalOptions,
                     ),
                 ),
             ),
             Preference.PreferenceGroup(
-                title = "Display",
+                title = stringResource(AMR.strings.pref_schedule_display_group),
                 preferenceItems = persistentListOf(
                     Preference.PreferenceItem.ListPreference(
                         pref = schedulePreferences.titleLanguage(),
-                        title = "Preferred title language",
-                        subtitle = "Language used to display anime titles in the schedule",
+                        title = stringResource(AMR.strings.pref_schedule_title_language),
+                        subtitle = stringResource(AMR.strings.pref_schedule_title_language_summary),
                         entries = titleLanguageOptions,
                     ),
                     Preference.PreferenceItem.SwitchPreference(
                         pref = schedulePreferences.showAdultContent(),
-                        title = "Show 18+ anime",
-                        subtitle = "Include adult-only anime in the airing schedule",
+                        title = stringResource(AMR.strings.pref_schedule_show_adult),
+                        subtitle = stringResource(AMR.strings.pref_schedule_show_adult_summary),
                     ),
                 ),
             ),
@@ -116,7 +117,7 @@ object SettingsScheduleScreen : SearchableSettings {
                 title = stringResource(MR.strings.pref_schedule_about_title),
                 preferenceItems = persistentListOf(
                     Preference.PreferenceItem.InfoPreference(
-                        title = "The airing schedule is powered by AniList. Upload delay tracking monitors when episodes appear on your installed sources vs the official air time, calculates the average delay, and shows estimated upload times. Tap the play or search icon on any anime to find it in your installed sources. Tap the bookmark icon to add it to your library via search. Tap the bell to notify for the next episode; hold 1 second for every episode.",
+                        title = stringResource(AMR.strings.pref_schedule_about_info),
                     ),
                 ),
             ),
