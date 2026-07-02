@@ -29,7 +29,7 @@ object SettingsScheduleScreen : SearchableSettings {
 
         val installedSourceOptions = remember(extensionsState) {
             extensionsState?.installed
-                ?.flatMap { ext -> ext.sources.map { src -> src.id.toString() to "${ext.name} › ${src.name}" } }
+                ?.flatMap { ext -> ext.sources.map { src -> src.id.toString() to "${ext.name} \u203a ${src.name}" } }
                 ?.distinctBy { it.first }
                 ?.sortedBy { it.second }
                 ?.toMap()
@@ -73,6 +73,11 @@ object SettingsScheduleScreen : SearchableSettings {
                         title = "Filter by source availability",
                         subtitle = "Only show anime that your selected favorite sources are likely to carry",
                     ),
+                    Preference.PreferenceItem.SwitchPreference(
+                        pref = schedulePreferences.autoAddViaPinnedSources(),
+                        title = "Auto-add via pinned sources",
+                        subtitle = "When tapping the bookmark button, search only in your pinned sources (from Browse) using priority order \u2014 1st pinned gets highest priority",
+                    ),
                 ),
             ),
             Preference.PreferenceGroup(
@@ -81,12 +86,12 @@ object SettingsScheduleScreen : SearchableSettings {
                     Preference.PreferenceItem.SwitchPreference(
                         pref = schedulePreferences.uploadDelayEnabled(),
                         title = "Auto-sync source upload time",
-                        subtitle = "Learn how long after the official air time each source uploads episodes, then show estimated availability time on the schedule",
+                        subtitle = "Learn how long after the official air time each pinned source uploads episodes, then show estimated availability time. Priority: 1st pinned source \u2192 2nd \u2192 etc.",
                     ),
                     Preference.PreferenceItem.ListPreference(
                         pref = schedulePreferences.uploadDelayRefreshInterval(),
                         title = "Refresh interval",
-                        subtitle = "How often to check sources for new episodes. Once a delay is learned it is cached — checking stops until the interval elapses",
+                        subtitle = "How often to check sources for new episodes. Once a delay is learned it is cached \u2014 checking stops until the interval elapses",
                         entries = intervalOptions,
                     ),
                 ),
@@ -111,7 +116,7 @@ object SettingsScheduleScreen : SearchableSettings {
                 title = stringResource(MR.strings.pref_schedule_about_title),
                 preferenceItems = persistentListOf(
                     Preference.PreferenceItem.InfoPreference(
-                        title = "The airing schedule is powered by AniList. Upload delay tracking monitors when episodes appear on your installed sources vs the official air time, calculates the average delay, and shows estimated upload times. Tap the play or search icon on any anime to find it in your installed sources. Tap the bookmark icon to add it to your library via search.",
+                        title = "The airing schedule is powered by AniList. Upload delay tracking monitors when episodes appear on your installed sources vs the official air time, calculates the average delay, and shows estimated upload times. Tap the play or search icon on any anime to find it in your installed sources. Tap the bookmark icon to add it to your library via search. Tap the bell to notify for the next episode; hold 1 second for every episode.",
                     ),
                 ),
             ),
