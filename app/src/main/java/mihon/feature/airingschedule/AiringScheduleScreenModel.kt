@@ -85,19 +85,18 @@ class AiringScheduleScreenModel : StateScreenModel<AiringScheduleScreenModel.Sta
         weekStart: LocalDate? = mutableState.value.weekStartDate,
         weekEnd: LocalDate? = mutableState.value.weekEndDate,
     ) {
-        val showOnlyFavorites = schedulePrefs.showOnlyFavoriteSources().get()
         val filterByAvailability = schedulePrefs.filterBySourceAvailability().get()
         val favoriteIds = schedulePrefs.favoriteSourceIds().get()
         val titleLang = schedulePrefs.titleLanguage().get()
         val zone = ZoneId.systemDefault()
 
         val filtered = entries.filter { entry ->
-            if (showOnlyFavorites && favoriteIds.isEmpty()) return@filter true
-            if ((showOnlyFavorites || filterByAvailability) && favoriteIds.isNotEmpty()) {
-                true
-            } else {
-                true
-            }
+            // filterByAvailability: only show episodes that have already aired,
+            // giving sources time to upload the episode.
+            // showOnlyFavoriteSources: requires per-entry source membership data which
+            // is not available from AniList; treated as a UI pass-through until
+            // library/source integration provides that linkage.
+            !filterByAvailability || entry.hasAired()
         }
 
         val grouped = filtered.groupBy { entry ->
