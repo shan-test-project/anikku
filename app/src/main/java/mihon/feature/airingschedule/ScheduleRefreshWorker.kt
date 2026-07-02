@@ -19,10 +19,15 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Periodic WorkManager job that:
- *  1. Refreshes the airing schedule cache weekly.
- *  2. For each episode that has aired, records the elapsed time since the official
- *     air time as an EMA (α = 0.4) observation per source. The delay is continuously
- *     refined on every run so the estimate improves over time.
+ *  1. Refreshes the airing schedule for the current week.
+ *  2. For each episode that has aired since the last check run, records the elapsed
+ *     time since the official air time as an EMA (α = 0.4) observation per source.
+ *     Using [lastDelayCheckTime] as a cursor prevents re-counting old airings on every
+ *     run, which would otherwise bias the EMA toward the 24h window cap.
+ *
+ * Note: the observed delay is "time from official air time to when the worker runs",
+ * not actual source-fetch time. True source-availability tracking requires
+ * extension-level discovery events and is planned for a future iteration.
  */
 class ScheduleRefreshWorker(
     private val context: Context,
@@ -50,14 +55,16 @@ class ScheduleRefreshWorker(
             )
 
             val nowEpoch = System.currentTimeMillis() / 1000L
+            // Only process airings since the last check to avoid double-counting.
+            val lastCheckEpoch = schedulePrefs.lastDelayCheckTime().get()
             val favoriteSourceIds = schedulePrefs.favoriteSourceIds().get()
 
             entries
-                .filter { it.airingAt <= nowEpoch }
+                .filter { it.airingAt in (lastCheckEpoch + 1)..nowEpoch }
                 .forEach { entry ->
-                    favoriteSourceIds.forEach { sourceId ->
-                        val delayMinutes = (nowEpoch - entry.airingAt) / 60L
-                        if (delayMinutes in 0..(24 * 60)) {
+                    val delayMinutes = (nowEpoch - entry.airingAt) / 60L
+                    if (delayMinutes in 0..(24 * 60)) {
+                        favoriteSourceIds.forEach { sourceId ->
                             delayTracker.recordObservation(sourceId, delayMinutes)
                         }
                     }
