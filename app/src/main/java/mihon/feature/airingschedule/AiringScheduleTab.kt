@@ -52,7 +52,9 @@ import eu.kanade.tachiyomi.ui.browse.source.globalsearch.SourceFilter
 import kotlinx.coroutines.launch
 import mihon.feature.airingschedule.components.BellNotifyState
 import mihon.feature.airingschedule.components.ScheduleAnimeCard
+import tachiyomi.i18n.ank.AMR
 import tachiyomi.presentation.core.components.material.Scaffold
+import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.screens.EmptyScreen
 import tachiyomi.presentation.core.screens.LoadingScreen
 import uy.kohesive.injekt.Injekt
@@ -79,7 +81,7 @@ data object AiringScheduleTab : Tab {
         @Composable
         get() = TabOptions(
             index = 3u,
-            title = "Schedule",
+            title = stringResource(AMR.strings.label_schedule_tab),
             icon = rememberVectorPainter(Icons.Outlined.DateRange),
         )
 
@@ -116,7 +118,7 @@ data object AiringScheduleTab : Tab {
                     title = {
                         Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
                             Text(
-                                text = "Airing Schedule",
+                                text = stringResource(AMR.strings.label_airing_schedule),
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,
                             )
@@ -132,10 +134,10 @@ data object AiringScheduleTab : Tab {
                     },
                     actions = {
                         IconButton(onClick = { screenModel.loadSchedule() }) {
-                            Icon(Icons.Outlined.Refresh, contentDescription = "Refresh")
+                            Icon(Icons.Outlined.Refresh, contentDescription = stringResource(AMR.strings.schedule_refresh_content_desc))
                         }
                         IconButton(onClick = { navigator.push(SettingsScheduleScreen) }) {
-                            Icon(Icons.Outlined.Settings, contentDescription = "Schedule settings")
+                            Icon(Icons.Outlined.Settings, contentDescription = stringResource(AMR.strings.schedule_settings_content_desc))
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -307,7 +309,7 @@ private fun ScheduleErrorContent(
             modifier = Modifier.fillMaxWidth().padding(32.dp),
         ) {
             Text(
-                text = "Unable to load schedule",
+                text = stringResource(AMR.strings.schedule_error_title),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 textAlign = TextAlign.Center,
@@ -324,7 +326,7 @@ private fun ScheduleErrorContent(
                     contentDescription = null,
                     modifier = Modifier.padding(end = 6.dp),
                 )
-                Text("Retry")
+                Text(stringResource(AMR.strings.schedule_retry))
             }
         }
     }
