@@ -1,15 +1,19 @@
 package eu.kanade.presentation.more.settings.screen
 
+import android.content.Context
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import eu.kanade.domain.extension.interactor.GetExtensionsByType
 import eu.kanade.presentation.more.settings.Preference
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableMap
 import mihon.feature.airingschedule.SchedulePreferences
+import mihon.feature.airingschedule.ScheduleRefreshWorker
 import tachiyomi.i18n.MR
 import tachiyomi.i18n.ank.AMR
 import tachiyomi.presentation.core.i18n.stringResource
@@ -24,9 +28,20 @@ object SettingsScheduleScreen : SearchableSettings {
 
     @Composable
     override fun getPreferences(): List<Preference> {
+        val context = LocalContext.current
         val schedulePreferences = remember { Injekt.get<SchedulePreferences>() }
         val getExtensionsByType = remember { Injekt.get<GetExtensionsByType>() }
         val extensionsState by getExtensionsByType.subscribe().collectAsState(initial = null)
+
+        // Keep WorkManager in sync with preference changes made in this screen.
+        val uploadDelayEnabled by schedulePreferences.uploadDelayEnabled().changes()
+            .collectAsState(initial = schedulePreferences.uploadDelayEnabled().get())
+        val uploadDelayInterval by schedulePreferences.uploadDelayRefreshInterval().changes()
+            .collectAsState(initial = schedulePreferences.uploadDelayRefreshInterval().get())
+
+        LaunchedEffect(uploadDelayEnabled, uploadDelayInterval) {
+            syncWorker(context, schedulePreferences)
+        }
 
         val installedSourceOptions = remember(extensionsState) {
             extensionsState?.installed
@@ -122,5 +137,13 @@ object SettingsScheduleScreen : SearchableSettings {
                 ),
             ),
         )
+    }
+
+    private fun syncWorker(context: Context, prefs: SchedulePreferences) {
+        if (prefs.uploadDelayEnabled().get()) {
+            ScheduleRefreshWorker.schedule(context, prefs.uploadDelayRefreshInterval().get())
+        } else {
+            ScheduleRefreshWorker.cancel(context)
+        }
     }
 }
