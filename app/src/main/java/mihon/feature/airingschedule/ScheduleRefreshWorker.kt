@@ -8,7 +8,6 @@ import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import eu.kanade.domain.source.service.SourcePreferences
 import tachiyomi.core.common.util.lang.withIOContext
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
@@ -21,10 +20,9 @@ import java.util.concurrent.TimeUnit
 /**
  * Periodic WorkManager job that:
  *  1. Refreshes the airing schedule cache weekly.
- *  2. For each episode that has aired, checks installed favorite sources and
- *     records how long after the official air-time the episode became available
- *     (the "upload delay").  Once the delay is learned it does not re-check
- *     until the configured interval elapses.
+ *  2. For each episode that has aired, records the elapsed time since the official
+ *     air time as an EMA (α = 0.4) observation per source. The delay is continuously
+ *     refined on every run so the estimate improves over time.
  */
 class ScheduleRefreshWorker(
     private val context: Context,
@@ -58,12 +56,9 @@ class ScheduleRefreshWorker(
                 .filter { it.airingAt <= nowEpoch }
                 .forEach { entry ->
                     favoriteSourceIds.forEach { sourceId ->
-                        val knownDelay = delayTracker.getDelay(sourceId)
-                        if (knownDelay == null) {
-                            val delayMinutes = (nowEpoch - entry.airingAt) / 60L
-                            if (delayMinutes < 24 * 60) {
-                                delayTracker.recordObservation(sourceId, delayMinutes)
-                            }
+                        val delayMinutes = (nowEpoch - entry.airingAt) / 60L
+                        if (delayMinutes in 0..(24 * 60)) {
+                            delayTracker.recordObservation(sourceId, delayMinutes)
                         }
                     }
                 }
