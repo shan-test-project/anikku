@@ -48,7 +48,9 @@ import cafe.adriel.voyager.navigator.tab.TabOptions
 import eu.kanade.presentation.more.settings.screen.SettingsScheduleScreen
 import eu.kanade.presentation.util.Tab
 import eu.kanade.tachiyomi.ui.browse.source.globalsearch.GlobalSearchScreen
+import eu.kanade.tachiyomi.ui.browse.source.globalsearch.SourceFilter
 import kotlinx.coroutines.launch
+import mihon.feature.airingschedule.components.BellNotifyState
 import mihon.feature.airingschedule.components.ScheduleAnimeCard
 import tachiyomi.presentation.core.components.material.Scaffold
 import tachiyomi.presentation.core.screens.EmptyScreen
@@ -92,10 +94,12 @@ data object AiringScheduleTab : Tab {
         val scope = rememberCoroutineScope()
         val context = LocalContext.current
 
-        // Ensure the background refresh worker is scheduled whenever the tab is entered.
+        val schedulePrefs = Injekt.get<SchedulePreferences>()
+        val autoAddViaPinned by schedulePrefs.autoAddViaPinnedSources().changes()
+            .collectAsState(initial = schedulePrefs.autoAddViaPinnedSources().get())
+
         LaunchedEffect(Unit) {
-            val prefs = Injekt.get<SchedulePreferences>()
-            ScheduleRefreshWorker.schedule(context, prefs.uploadDelayRefreshInterval().get())
+            ScheduleRefreshWorker.schedule(context, schedulePrefs.uploadDelayRefreshInterval().get())
         }
 
         val todayIndex = orderedDays.indexOf(state.selectedDay).coerceAtLeast(0)
@@ -165,7 +169,17 @@ data object AiringScheduleTab : Tab {
                             titleLanguage = state.titleLanguage,
                             sourceDelays = state.sourceDelays,
                             favoriteSourceIds = state.favoriteSourceIds,
-                            onSearchClick = { title -> navigator.push(GlobalSearchScreen(title)) },
+                            bellStates = state.bellStates,
+                            onBellTap = { entry -> screenModel.toggleBellTap(context, entry) },
+                            onBellLongPress = { entry -> screenModel.toggleBellLongPress(context, entry) },
+                            onSearchClick = { title -> navigator.push(GlobalSearchScreen(title, initialSourceFilter = SourceFilter.All)) },
+                            onBookmarkClick = { title ->
+                                if (autoAddViaPinned) {
+                                    navigator.push(GlobalSearchScreen(title, initialSourceFilter = SourceFilter.PinnedOnly))
+                                } else {
+                                    navigator.push(GlobalSearchScreen(title, initialSourceFilter = SourceFilter.All))
+                                }
+                            },
                         )
                     }
                 }
@@ -177,7 +191,7 @@ data object AiringScheduleTab : Tab {
 private fun buildWeekRangeLabel(start: LocalDate?, end: LocalDate?): String {
     if (start == null || end == null) return ""
     val fmt = DateTimeFormatter.ofPattern("MMM d", Locale.getDefault())
-    return "${start.format(fmt)} – ${end.format(fmt)}"
+    return "${start.format(fmt)} \u2013 ${end.format(fmt)}"
 }
 
 @Composable
@@ -245,7 +259,11 @@ private fun ScheduleDayContent(
     titleLanguage: SchedulePreferences.TitleLanguage,
     sourceDelays: Map<String, Long>,
     favoriteSourceIds: Set<String>,
+    bellStates: Map<Int, BellNotifyState>,
+    onBellTap: (AiringScheduleEntry) -> Unit,
+    onBellLongPress: (AiringScheduleEntry) -> Unit,
     onSearchClick: (String) -> Unit,
+    onBookmarkClick: (String) -> Unit,
 ) {
     if (entries.isEmpty()) {
         EmptyScreen(stringRes = tachiyomi.i18n.MR.strings.information_no_airing_today)
@@ -263,7 +281,11 @@ private fun ScheduleDayContent(
                 titleLanguage = titleLanguage,
                 sourceDelays = sourceDelays,
                 favoriteSourceIds = favoriteSourceIds,
+                bellState = bellStates[entry.scheduleId] ?: BellNotifyState.NONE,
+                onBellTap = { onBellTap(entry) },
+                onBellLongPress = { onBellLongPress(entry) },
                 onSearchClick = onSearchClick,
+                onBookmarkClick = onBookmarkClick,
             )
         }
     }
