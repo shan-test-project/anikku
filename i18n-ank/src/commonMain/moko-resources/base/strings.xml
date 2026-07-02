@@ -226,4 +226,39 @@
 
     <string name="action_clear_anime">Clear anime</string>
     <string name="episodes_from_database">Episodes &amp; History from Database</string>
+
+    <!-- Airing Schedule -->
+    <string name="label_schedule_tab">Schedule</string>
+    <string name="label_airing_schedule">Airing Schedule</string>
+    <string name="schedule_refresh_content_desc">Refresh schedule</string>
+    <string name="schedule_settings_content_desc">Schedule settings</string>
+    <string name="schedule_error_title">Unable to load schedule</string>
+    <string name="schedule_retry">Retry</string>
+    <string name="pref_schedule_sources_group">Favorite Sources</string>
+    <string name="pref_schedule_filter_availability">Filter by source availability</string>
+    <string name="pref_schedule_filter_availability_summary">Only show anime that your selected favorite sources are likely to carry</string>
+    <string name="pref_schedule_auto_add_pinned">Auto-add via pinned sources</string>
+    <string name="pref_schedule_auto_add_pinned_summary">When tapping the bookmark button, search only in your pinned sources (from Browse) using priority order — 1st pinned gets highest priority</string>
+    <string name="pref_schedule_upload_delay_group">Upload Delay Tracking</string>
+    <string name="pref_schedule_upload_delay_enabled">Auto-sync source upload time</string>
+    <string name="pref_schedule_upload_delay_enabled_summary">Learn how long after the official air time each pinned source uploads episodes, then show estimated availability time. Priority: 1st pinned source → 2nd → etc.</string>
+    <string name="pref_schedule_refresh_interval">Refresh interval</string>
+    <string name="pref_schedule_refresh_interval_summary">How often to re-check and continuously refine the learned upload delay per source using a running average</string>
+    <string name="pref_schedule_display_group">Display</string>
+    <string name="pref_schedule_title_language">Preferred title language</string>
+    <string name="pref_schedule_title_language_summary">Language used to display anime titles in the schedule</string>
+    <string name="pref_schedule_show_adult">Show 18+ anime</string>
+    <string name="pref_schedule_show_adult_summary">Include adult-only anime in the airing schedule</string>
+    <string name="pref_schedule_about_info">The airing schedule is powered by AniList. Upload delay tracking monitors when episodes appear on your pinned sources vs the official air time — uses priority order (1st pinned source takes precedence). Tap the play or search icon on any anime to find it in All sources. Tap the bookmark icon to add it to your library — enable 'Auto-add via pinned sources' to search only in your pinned sources. Tap the bell to notify for the next episode; hold 0.5s for every episode.</string>
+    <string name="pref_schedule_interval_30min">Every 30 minutes</string>
+    <string name="pref_schedule_interval_1h">Every 1 hour</string>
+    <string name="pref_schedule_interval_2h">Every 2 hours</string>
+    <string name="pref_schedule_interval_6h">Every 6 hours</string>
+    <string name="pref_schedule_interval_12h">Every 12 hours</string>
+    <string name="pref_schedule_interval_never">Never (manual only)</string>
+    <string name="pref_schedule_lang_user_preferred">User Preferred (AniList default)</string>
+    <string name="pref_schedule_lang_english">English</string>
+    <string name="pref_schedule_lang_romaji">Romaji</string>
+    <string name="pref_schedule_lang_native">Native</string>
 </resources>
+
