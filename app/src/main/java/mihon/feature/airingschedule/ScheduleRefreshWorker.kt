@@ -21,7 +21,7 @@ import java.util.concurrent.TimeUnit
  * Periodic WorkManager job that:
  *  1. Refreshes the airing schedule for the current week.
  *  2. For each episode that has aired since the last check run, records the elapsed
- *     time since the official air time as an EMA (α = 0.4) observation per source.
+ *     time since the official air time as an EMA (alpha = 0.4) observation per source.
  *     Using [lastDelayCheckTime] as a cursor prevents re-counting old airings on every
  *     run, which would otherwise bias the EMA toward the 24h window cap.
  *
