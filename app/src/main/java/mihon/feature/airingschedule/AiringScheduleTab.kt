@@ -166,7 +166,7 @@ data object AiringScheduleTab : Tab {
 
 private fun buildWeekRangeLabel(start: LocalDate?, end: LocalDate?): String {
     if (start == null || end == null) return ""
-    val fmt = DateTimeFormatter.ofPattern("MMM d")
+    val fmt = DateTimeFormatter.ofPattern("MMM d", Locale.getDefault())
     return "${start.format(fmt)} – ${end.format(fmt)}"
 }
 
