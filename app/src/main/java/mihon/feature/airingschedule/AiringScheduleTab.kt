@@ -36,6 +36,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -52,6 +53,8 @@ import mihon.feature.airingschedule.components.ScheduleAnimeCard
 import tachiyomi.presentation.core.components.material.Scaffold
 import tachiyomi.presentation.core.screens.EmptyScreen
 import tachiyomi.presentation.core.screens.LoadingScreen
+import uy.kohesive.injekt.Injekt
+import uy.kohesive.injekt.api.get
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -87,6 +90,13 @@ data object AiringScheduleTab : Tab {
         val screenModel = rememberScreenModel { AiringScheduleScreenModel() }
         val state by screenModel.state.collectAsState()
         val scope = rememberCoroutineScope()
+        val context = LocalContext.current
+
+        // Ensure the background refresh worker is scheduled whenever the tab is entered.
+        LaunchedEffect(Unit) {
+            val prefs = Injekt.get<SchedulePreferences>()
+            ScheduleRefreshWorker.schedule(context, prefs.uploadDelayRefreshInterval().get())
+        }
 
         val todayIndex = orderedDays.indexOf(state.selectedDay).coerceAtLeast(0)
         val pagerState = rememberPagerState(initialPage = todayIndex) { orderedDays.size }
@@ -201,7 +211,7 @@ private fun ScheduleDayTabRow(
                             text = dayShort,
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = if (isToday) FontWeight.ExtraBold else FontWeight.Normal,
-                            color = if (isToday && pagerState.currentPage != index) {
+                            color = if (isToday) {
                                 MaterialTheme.colorScheme.primary
                             } else {
                                 MaterialTheme.colorScheme.onSurface
