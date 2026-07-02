@@ -24,6 +24,11 @@ class SchedulePreferences(
         false,
     )
 
+    fun autoAddViaPinnedSources() = preferenceStore.getBoolean(
+        "schedule_auto_add_via_pinned_sources",
+        true,
+    )
+
     fun titleLanguage() = preferenceStore.getEnum(
         "schedule_title_language",
         TitleLanguage.USER_PREFERRED,
@@ -56,6 +61,11 @@ class SchedulePreferences(
 
     fun scheduledAlarmKeys() = preferenceStore.getStringSet(
         "schedule_scheduled_alarm_keys",
+        emptySet(),
+    )
+
+    fun scheduledSeriesMediaIds() = preferenceStore.getStringSet(
+        "schedule_scheduled_series_media_ids",
         emptySet(),
     )
 }
