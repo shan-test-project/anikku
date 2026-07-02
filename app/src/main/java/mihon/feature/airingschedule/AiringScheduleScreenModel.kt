@@ -88,13 +88,18 @@ class AiringScheduleScreenModel : StateScreenModel<AiringScheduleScreenModel.Sta
         weekStart: LocalDate? = mutableState.value.weekStartDate,
         weekEnd: LocalDate? = mutableState.value.weekEndDate,
     ) {
+        val showOnlyFavorites = schedulePrefs.showOnlyFavoriteSources().get()
         val filterByAvailability = schedulePrefs.filterBySourceAvailability().get()
         val favoriteIds = schedulePrefs.favoriteSourceIds().get()
         val titleLang = schedulePrefs.titleLanguage().get()
         val zone = ZoneId.systemDefault()
 
         val filtered = entries.filter { entry ->
-            !filterByAvailability || entry.hasAired()
+            // If restricted to favorite sources but none are selected, hide everything.
+            val passesSourceFilter = !showOnlyFavorites || favoriteIds.isNotEmpty()
+            // Only show episodes that have already aired when filtering by source availability.
+            val passesAvailabilityFilter = !filterByAvailability || entry.hasAired()
+            passesSourceFilter && passesAvailabilityFilter
         }
 
         val grouped = filtered.groupBy { entry ->
