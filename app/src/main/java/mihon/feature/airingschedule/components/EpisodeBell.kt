@@ -15,7 +15,6 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -23,7 +22,6 @@ import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
-import androidx.core.graphics.ColorUtils
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -37,7 +35,7 @@ private const val LONG_PRESS_DURATION_MS = 500L
  * Per-anime notification bell shown on the Schedule tab.
  *
  * - A quick tap toggles a one-off alert for the next upcoming episode ([BellNotifyState.ONCE]).
- * - Pressing and holding for 4 seconds toggles recurring alerts for every future episode until
+ * - Pressing and holding for 0.5 seconds toggles recurring alerts for every future episode until
  *   the series finishes airing ([BellNotifyState.SERIES]).
  *
  * The bell is tinted relative to the current Material theme: idle uses a neutral surface tint,
@@ -121,25 +119,4 @@ fun EpisodeBell(
             }
         }
     }
-}
-
-private fun complementaryColor(base: Color, lighten: Boolean): Color {
-    val hsl = FloatArray(3)
-    ColorUtils.colorToHSL(base.toArgbCompat(), hsl)
-    hsl[0] = (hsl[0] + 180f) % 360f
-    if (lighten) {
-        hsl[1] = (hsl[1] * 0.6f).coerceIn(0f, 1f)
-        hsl[2] = (hsl[2] + (1f - hsl[2]) * 0.55f).coerceIn(0f, 1f)
-    }
-    val argb = ColorUtils.HSLToColor(hsl)
-    return Color(argb)
-}
-
-private fun Color.toArgbCompat(): Int {
-    return android.graphics.Color.argb(
-        (alpha * 255f).toInt(),
-        (red * 255f).toInt(),
-        (green * 255f).toInt(),
-        (blue * 255f).toInt(),
-    )
 }
