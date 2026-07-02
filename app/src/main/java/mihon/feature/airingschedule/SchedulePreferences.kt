@@ -53,4 +53,9 @@ class SchedulePreferences(
         "schedule_last_delay_check_time",
         0L,
     )
+
+    fun scheduledAlarmKeys() = preferenceStore.getStringSet(
+        "schedule_scheduled_alarm_keys",
+        emptySet(),
+    )
 }
