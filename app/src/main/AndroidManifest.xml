@@ -201,6 +201,7 @@
         <activity
             android:name=".ui.setting.track.TrackLoginActivity"
             android:exported="true"
+            android:launchMode="singleTask"
             android:label="@string/track_activity_name">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
@@ -261,6 +262,10 @@
 
         <receiver
             android:name=".data.notification.NotificationReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name="mihon.feature.airingschedule.notification.ScheduleAlarmReceiver"
             android:exported="false" />
 
         <service

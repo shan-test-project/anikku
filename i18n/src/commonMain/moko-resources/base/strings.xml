@@ -7,7 +7,7 @@
     <string name="not_selected">Not selected</string>
     <string name="action_menu_overflow_description">More options</string>
     <string name="action_bar_up_description">Navigate up</string>
-    <string name="app_name" translatable="false">Aniyomi</string>
+    <string name="app_name" translatable="false">Anikku</string>
     <string name="name">Name</string>
     <string name="categories">Categories</string>
     <string name="manga">Manga</string>
@@ -1187,7 +1187,7 @@
     <string name="episodes">Episodes</string>
     <string name="backup_settings_warning">Warning: Backing up settings will store your track passwords as well, do not share this backup file!</string>
     <string name="label_manga_library">Manga</string>
-    <string name="label_anime_library">Anime</string>
+    <string name="label_anime_library">Library</string>
     <string name="label_anime">Anime</string>
     <string name="label_manga">Manga</string>
     <string name="label_recent_anime_updates">Anime Updates</string>
@@ -1383,4 +1383,20 @@
     <string name="onboarding_storage_action_create_folder">Create default Aniyomi folder</string>
     <string name="download_speed_limit">Chapter download speed limit</string>
     <string name="download_speed_limit_hint">Set to 0 to disable the speed limit.</string>
+
+    <!-- Airing Schedule -->
+    <string name="information_no_airing_today">No anime airing today</string>
+    <string name="label_airing_schedule">Airing Schedule</string>
+    <string name="pref_category_schedule">Schedule</string>
+    <string name="pref_category_schedule_summary">Weekly airing schedule from AniList</string>
+    <string name="pref_schedule_sources_title">Favorite Sources</string>
+    <string name="pref_schedule_favorite_sources">Favorite sources</string>
+    <string name="pref_schedule_favorite_sources_summary">Select the sources used when searching anime from the schedule</string>
+    <string name="pref_schedule_show_only_favorites">Filter by favorite sources</string>
+    <string name="pref_schedule_show_only_favorites_summary">Show only schedule entries searchable in your selected favorite sources</string>
+    <string name="pref_schedule_about_title">About</string>
+    <string name="pref_schedule_about_info">The airing schedule is powered by AniList. Tap the search icon on any anime to find it in your installed sources.</string>
+    <string name="pref_bottom_nav_no_schedule">Move Schedule to the More tab</string>
+    <string name="pref_bottom_nav_no_feed">Move Feed to the More tab</string>
+    <string name="label_feed">Feed</string>
 </resources>
