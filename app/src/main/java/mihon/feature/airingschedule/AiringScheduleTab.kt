@@ -309,12 +309,10 @@ private fun ScheduleDayContent(
                 mediaKey in notifyOnceMediaIds -> BellNotifyState.ONCE
                 else -> BellNotifyState.NONE
             }
-            val isInLibrary = libraryAnimeTitles.any { libraryTitle ->
-                entry.titleUserPreferred.trim().lowercase() == libraryTitle ||
-                    entry.titleEnglish?.trim()?.lowercase() == libraryTitle ||
-                    entry.titleRomaji?.trim()?.lowercase() == libraryTitle ||
-                    entry.titleNative?.trim()?.lowercase() == libraryTitle
-            }
+            val isInLibrary = entry.titleUserPreferred.trim().lowercase() in libraryAnimeTitles ||
+                entry.titleEnglish?.trim()?.lowercase() in libraryAnimeTitles ||
+                entry.titleRomaji?.trim()?.lowercase() in libraryAnimeTitles ||
+                entry.titleNative?.trim()?.lowercase() in libraryAnimeTitles
             ScheduleAnimeCard(
                 entry = entry,
                 titleLanguage = titleLanguage,

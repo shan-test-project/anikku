@@ -51,7 +51,7 @@ class ScheduleAlarmReceiver : BroadcastReceiver() {
             .setContentIntent(pendingContentIntent)
             .build()
 
-        val notificationId = Notifications.ID_AIRING_SCHEDULE_BASE - (ScheduleNotifications.requestCode(mediaId, episode) % 10000)
+        val notificationId = Notifications.ID_AIRING_SCHEDULE_BASE - (kotlin.math.abs(ScheduleNotifications.requestCode(mediaId, episode)) % 10000)
         NotificationManagerCompat.from(context).apply {
             runCatching { notify(notificationId, notification) }
         }

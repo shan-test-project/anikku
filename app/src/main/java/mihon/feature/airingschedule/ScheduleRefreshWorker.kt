@@ -54,12 +54,18 @@ class ScheduleRefreshWorker(
             val nowEpoch = System.currentTimeMillis() / 1000L
             val favoriteSourceIds = schedulePrefs.favoriteSourceIds().get()
 
+            // Only record delay for episodes that aired within the last worker interval.
+            // This prevents re-recording the same episode on every subsequent run, which
+            // would cause the running average to drift upward indefinitely.
+            val lastCheckTime = schedulePrefs.lastDelayCheckTime().get()
+            val windowStart = if (lastCheckTime > 0L) lastCheckTime else (nowEpoch - 24 * 3600)
+
             entries
-                .filter { it.airingAt <= nowEpoch }
+                .filter { it.airingAt in windowStart..nowEpoch }
                 .forEach { entry ->
-                    favoriteSourceIds.forEach { sourceId ->
-                        val delayMinutes = (nowEpoch - entry.airingAt) / 60L
-                        if (delayMinutes in 0..(24 * 60)) {
+                    val delayMinutes = (nowEpoch - entry.airingAt) / 60L
+                    if (delayMinutes in 0..(24 * 60)) {
+                        favoriteSourceIds.forEach { sourceId ->
                             delayTracker.recordObservation(sourceId, delayMinutes)
                         }
                     }

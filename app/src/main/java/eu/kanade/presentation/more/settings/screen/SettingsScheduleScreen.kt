@@ -13,6 +13,7 @@ import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableMap
 import mihon.feature.airingschedule.ScheduleDataRefreshWorker
 import mihon.feature.airingschedule.SchedulePreferences
+import mihon.feature.airingschedule.ScheduleRefreshWorker
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.i18n.stringResource
 import uy.kohesive.injekt.Injekt
@@ -36,11 +37,24 @@ object SettingsScheduleScreen : SearchableSettings {
         val autoRefreshFrequencyPref = schedulePreferences.scheduleAutoRefreshFrequency()
         val autoRefreshFrequency by autoRefreshFrequencyPref.changes().collectAsState(initial = autoRefreshFrequencyPref.get())
 
+        val uploadDelayEnabledPref = schedulePreferences.uploadDelayEnabled()
+        val uploadDelayEnabled by uploadDelayEnabledPref.changes().collectAsState(initial = uploadDelayEnabledPref.get())
+        val uploadDelayIntervalPref = schedulePreferences.uploadDelayRefreshInterval()
+        val uploadDelayInterval by uploadDelayIntervalPref.changes().collectAsState(initial = uploadDelayIntervalPref.get())
+
         LaunchedEffect(autoRefreshEnabled, autoRefreshFrequency) {
             if (autoRefreshEnabled) {
                 ScheduleDataRefreshWorker.schedule(context, autoRefreshFrequency)
             } else {
                 ScheduleDataRefreshWorker.cancel(context)
+            }
+        }
+
+        LaunchedEffect(uploadDelayEnabled, uploadDelayInterval) {
+            if (uploadDelayEnabled) {
+                ScheduleRefreshWorker.schedule(context, uploadDelayInterval)
+            } else {
+                ScheduleRefreshWorker.cancel(context)
             }
         }
 

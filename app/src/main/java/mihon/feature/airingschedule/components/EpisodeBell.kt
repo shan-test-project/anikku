@@ -23,7 +23,6 @@ import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
-import androidx.core.graphics.ColorUtils
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -123,23 +122,3 @@ fun EpisodeBell(
     }
 }
 
-private fun complementaryColor(base: Color, lighten: Boolean): Color {
-    val hsl = FloatArray(3)
-    ColorUtils.colorToHSL(base.toArgbCompat(), hsl)
-    hsl[0] = (hsl[0] + 180f) % 360f
-    if (lighten) {
-        hsl[1] = (hsl[1] * 0.6f).coerceIn(0f, 1f)
-        hsl[2] = (hsl[2] + (1f - hsl[2]) * 0.55f).coerceIn(0f, 1f)
-    }
-    val argb = ColorUtils.HSLToColor(hsl)
-    return Color(argb)
-}
-
-private fun Color.toArgbCompat(): Int {
-    return android.graphics.Color.argb(
-        (alpha * 255f).toInt(),
-        (red * 255f).toInt(),
-        (green * 255f).toInt(),
-        (blue * 255f).toInt(),
-    )
-}

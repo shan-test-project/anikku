@@ -18,7 +18,7 @@ data class AiringScheduleEntry(
     val genres: List<String>,
 ) {
     fun displayTitle(language: SchedulePreferences.TitleLanguage): String = when (language) {
-        SchedulePreferences.TitleLanguage.ENGLISH -> titleEnglish?.takeIf { it.isNotBlank() } ?: titleRomaji ?: titleUserPreferred
+        SchedulePreferences.TitleLanguage.ENGLISH -> titleEnglish?.takeIf { it.isNotBlank() } ?: titleRomaji?.takeIf { it.isNotBlank() } ?: titleUserPreferred
         SchedulePreferences.TitleLanguage.ROMAJI -> titleRomaji?.takeIf { it.isNotBlank() } ?: titleUserPreferred
         SchedulePreferences.TitleLanguage.NATIVE -> titleNative?.takeIf { it.isNotBlank() } ?: titleUserPreferred
         SchedulePreferences.TitleLanguage.USER_PREFERRED -> titleUserPreferred
