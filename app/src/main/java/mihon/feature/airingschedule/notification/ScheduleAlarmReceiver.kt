@@ -6,6 +6,7 @@ import android.content.Intent
 import android.graphics.Bitmap
 import androidx.core.app.NotificationCompat
 import androidx.core.graphics.drawable.toBitmap
+import coil3.asDrawable
 import coil3.imageLoader
 import coil3.request.ImageRequest
 import eu.kanade.tachiyomi.R
@@ -50,7 +51,9 @@ class ScheduleAlarmReceiver : BroadcastReceiver() {
 
     private suspend fun loadCoverBitmap(context: Context, url: String): Bitmap? = runCatching {
         val request = ImageRequest.Builder(context).data(url).build()
-        context.imageLoader.execute(request).image?.asDrawable(context.resources)?.toBitmap()
+        context.imageLoader.execute(request).image
+            ?.asDrawable(context.resources)
+            ?.toBitmap()
     }.getOrNull()
 
     private fun postNotification(

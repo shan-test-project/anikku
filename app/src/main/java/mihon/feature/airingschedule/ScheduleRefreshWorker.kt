@@ -79,7 +79,7 @@ class ScheduleRefreshWorker(
             // catalogue for every scheduled anime.
             val libraryAnime = getLibraryAnime.await()
                 .map { it.anime }
-                .filter { it.source in trackedSourceIds }
+                .filter { it.source.toString() in trackedSourceIds }
             if (libraryAnime.isEmpty()) {
                 schedulePrefs.lastDelayCheckTime().set(nowEpoch)
                 return@withIOContext Result.success()
