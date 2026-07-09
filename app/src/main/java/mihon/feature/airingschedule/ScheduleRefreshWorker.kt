@@ -8,8 +8,11 @@ import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import eu.kanade.domain.anime.model.toSAnime
 import eu.kanade.domain.source.service.SourcePreferences
 import tachiyomi.core.common.util.lang.withIOContext
+import tachiyomi.domain.anime.interactor.GetLibraryAnime
+import tachiyomi.domain.source.service.SourceManager
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.time.DayOfWeek
@@ -17,14 +20,16 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.temporal.TemporalAdjusters
 import java.util.concurrent.TimeUnit
+import kotlin.math.abs
 
 /**
  * Periodic WorkManager job that:
  *  1. Refreshes the airing schedule cache weekly.
- *  2. For each episode that has aired, checks installed favorite sources and
- *     records how long after the official air-time the episode became available
- *     (the "upload delay").  Once the delay is learned it does not re-check
- *     until the configured interval elapses.
+ *  2. For episodes that have aired and match an anime already in the user's library from a
+ *     favorite/pinned source, fetches that specific source's real episode list and compares its
+ *     actual upload timestamp against AniList's official air time to learn a genuine per-source
+ *     upload delay. Scoped to library anime only (not every source's full catalogue) so this
+ *     stays fast — it never crawls every anime on every source.
  */
 class ScheduleRefreshWorker(
     private val context: Context,
@@ -35,6 +40,8 @@ class ScheduleRefreshWorker(
         try {
             val schedulePrefs = Injekt.get<SchedulePreferences>()
             val delayTracker = Injekt.get<UploadDelayTracker>()
+            val sourceManager = Injekt.get<SourceManager>()
+            val getLibraryAnime = Injekt.get<GetLibraryAnime>()
 
             if (!schedulePrefs.uploadDelayEnabled().get()) return@withIOContext Result.success()
 
@@ -52,30 +59,59 @@ class ScheduleRefreshWorker(
             )
 
             val nowEpoch = System.currentTimeMillis() / 1000L
-            val favoriteSourceIds = schedulePrefs.favoriteSourceIds().get()
+            val trackedSourceIds = schedulePrefs.favoriteSourceIds().get() +
+                Injekt.get<SourcePreferences>().pinnedSources().get()
+            if (trackedSourceIds.isEmpty()) return@withIOContext Result.success()
 
-            // Only record delay for episodes that aired within the last worker interval.
-            // This prevents re-recording the same episode on every subsequent run, which
-            // would cause the running average to drift upward indefinitely.
+            // Only consider episodes that aired within the last worker interval, so the same
+            // episode isn't re-checked (and the running average skewed) on every subsequent run.
             val lastCheckTime = schedulePrefs.lastDelayCheckTime().get()
             val windowStart = if (lastCheckTime > 0L) lastCheckTime else nowEpoch - 24 * 3600
+            val airedEntries = entries.filter { it.airingAt in windowStart..nowEpoch }
+            if (airedEntries.isEmpty()) {
+                schedulePrefs.lastDelayCheckTime().set(nowEpoch)
+                return@withIOContext Result.success()
+            }
 
-            // Collect all (sourceId, delayMinutes) pairs first and flush in one batch to
-            // avoid repeated disk reads/writes per entry. The 15-minute floor filters out
-            // near-zero observations that almost certainly precede the source upload — this
-            // is still a time-based approximation; querying source catalogs directly would
-            // require source-specific API calls beyond the scope of a background worker.
+            // Bound the work to anime already in the user's library that live on a
+            // favorite/pinned source — this is the only set where we can resolve a concrete
+            // (anime, source) pair to actually query, so we never scan every source's full
+            // catalogue for every scheduled anime.
+            val libraryAnime = getLibraryAnime.await()
+                .map { it.anime }
+                .filter { it.source in trackedSourceIds }
+            if (libraryAnime.isEmpty()) {
+                schedulePrefs.lastDelayCheckTime().set(nowEpoch)
+                return@withIOContext Result.success()
+            }
+
             val observations = mutableListOf<Pair<String, Long>>()
-            entries
-                .filter { it.airingAt in windowStart..nowEpoch }
-                .forEach { entry ->
-                    val delayMinutes = (nowEpoch - entry.airingAt) / 60L
-                    if (delayMinutes in 15L..(24 * 60)) {
-                        favoriteSourceIds.forEach { sourceId ->
-                            observations.add(sourceId to delayMinutes)
-                        }
+            for (entry in airedEntries) {
+                val titleCandidates = listOfNotNull(
+                    entry.titleUserPreferred,
+                    entry.titleEnglish,
+                    entry.titleRomaji,
+                    entry.titleNative,
+                ).map { it.trim().lowercase() }.toSet()
+
+                val matches = libraryAnime.filter { it.title.trim().lowercase() in titleCandidates }
+                for (anime in matches) {
+                    val source = sourceManager.get(anime.source) ?: continue
+                    val episodes = runCatching { source.getEpisodeList(anime.toSAnime()) }.getOrNull() ?: continue
+                    val matchingEpisode = episodes.firstOrNull { abs(it.episode_number - entry.episode) < 0.01f }
+                        ?: continue
+                    val uploadDate = matchingEpisode.date_upload
+                    if (uploadDate <= 0L) continue
+
+                    val delayMinutes = (uploadDate / 1000L - entry.airingAt) / 60L
+                    // Discard implausible outliers (source's clock/metadata far off, or the
+                    // episode predates this air date entirely) rather than let them corrupt
+                    // the running average.
+                    if (delayMinutes in -60L..(24 * 60)) {
+                        observations.add(anime.source.toString() to delayMinutes)
                     }
                 }
+            }
             delayTracker.recordObservations(observations)
 
             schedulePrefs.lastDelayCheckTime().set(nowEpoch)
@@ -106,6 +142,13 @@ class ScheduleRefreshWorker(
                 .setConstraints(
                     Constraints.Builder()
                         .setRequiredNetworkType(NetworkType.CONNECTED)
+                        // Explicitly does NOT require battery-not-low / device-idle, so this
+                        // still runs on a low battery or when the device is actively in use —
+                        // it is only gated on network availability. WorkManager may still defer
+                        // execution slightly under Doze regardless of the app's own
+                        // "unrestricted background battery usage" setting; that ceiling can only
+                        // be fully removed by running as a foreground service, which isn't
+                        // appropriate for a periodic background sync like this.
                         .build(),
                 )
                 .build()

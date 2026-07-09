@@ -5,7 +5,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import eu.kanade.domain.extension.interactor.GetExtensionsByType
 import eu.kanade.presentation.more.settings.Preference
@@ -14,6 +16,7 @@ import kotlinx.collections.immutable.toImmutableMap
 import mihon.feature.airingschedule.ScheduleDataRefreshWorker
 import mihon.feature.airingschedule.SchedulePreferences
 import mihon.feature.airingschedule.ScheduleRefreshWorker
+import mihon.feature.airingschedule.notification.ScheduleNotifications
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.i18n.stringResource
 import uy.kohesive.injekt.Injekt
@@ -56,6 +59,11 @@ object SettingsScheduleScreen : SearchableSettings {
             } else {
                 ScheduleRefreshWorker.cancel(context)
             }
+        }
+
+        var exactAlarmsAllowed by remember { mutableStateOf(ScheduleNotifications.canScheduleExactAlarms(context)) }
+        LaunchedEffect(Unit) {
+            exactAlarmsAllowed = ScheduleNotifications.canScheduleExactAlarms(context)
         }
 
         val installedSourceOptions = remember(extensionsState) {
@@ -144,13 +152,30 @@ object SettingsScheduleScreen : SearchableSettings {
                     Preference.PreferenceItem.SwitchPreference(
                         pref = schedulePreferences.uploadDelayEnabled(),
                         title = "Auto-sync source upload time",
-                        subtitle = "Learn how long after the official air time each pinned source uploads episodes, then show estimated availability time. Priority: 1st pinned source → 2nd → etc.",
+                        subtitle = "For anime already in your library from a favorite/pinned source, checks that source's real episode list against AniList's air time to learn its upload delay. Priority: 1st pinned source → 2nd → etc.",
                     ),
                     Preference.PreferenceItem.ListPreference(
                         pref = schedulePreferences.uploadDelayRefreshInterval(),
                         title = "Refresh interval",
                         subtitle = "How often to re-check and continuously refine the learned upload delay per source using a running average",
                         entries = intervalOptions,
+                    ),
+                ),
+            ),
+            Preference.PreferenceGroup(
+                title = "Notifications",
+                preferenceItems = persistentListOf(
+                    Preference.PreferenceItem.InfoPreference(
+                        title = if (exactAlarmsAllowed) {
+                            "Exact alarm permission is granted — the notification bell will fire at the precise air time, even in the background with battery optimization enabled."
+                        } else {
+                            "Exact alarm permission is not granted. On Android 13+, the notification bell may fire late without it. Tap Settings → Apps → Anikku Modified → Alarms & reminders to allow it, or tap below."
+                        },
+                    ),
+                    Preference.PreferenceItem.TextPreference(
+                        title = "Grant exact alarm permission",
+                        subtitle = if (exactAlarmsAllowed) "Already granted" else "Required for reliable on-time episode alerts",
+                        onClick = { ScheduleNotifications.requestExactAlarmPermission(context) },
                     ),
                 ),
             ),

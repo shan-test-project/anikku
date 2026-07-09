@@ -214,9 +214,13 @@ class AiringScheduleScreenModel : StateScreenModel<AiringScheduleScreenModel.Sta
             schedulePrefs.notifyOnceMediaIds().set(current - key)
             ScheduleNotifications.cancel(application, entry)
         } else {
-            schedulePrefs.notifyOnceMediaIds().set(current + key)
-            schedulePrefs.notifySeriesMediaIds().set(seriesCurrent - key)
-            ScheduleNotifications.ensureScheduled(application, entry)
+            // Only persist the "notify" preference if an alarm was actually scheduled —
+            // an already-aired entry has nothing to back the bell state, so don't leave a
+            // stuck ONCE indicator with no alarm behind it.
+            if (ScheduleNotifications.ensureScheduled(application, entry)) {
+                schedulePrefs.notifyOnceMediaIds().set(current + key)
+                schedulePrefs.notifySeriesMediaIds().set(seriesCurrent - key)
+            }
         }
         applyFilters()
     }

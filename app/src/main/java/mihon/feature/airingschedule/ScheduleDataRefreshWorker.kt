@@ -57,6 +57,19 @@ class ScheduleDataRefreshWorker(
 
             writeCache(context, weekStart.toEpochSecond(), entries)
 
+            // Re-arm alarms for any anime the user subscribed to "notify every episode" for.
+            // Series alarms are only ever scheduled from whichever week is currently loaded in
+            // the UI, so without this, a series subscription silently stops alerting once the
+            // originally-loaded week's episodes are exhausted. This periodic refresh (which runs
+            // independently of the Schedule tab being open) re-schedules alarms for each newly
+            // fetched week's unaired episodes belonging to a subscribed series.
+            val seriesIds = schedulePrefs.notifySeriesMediaIds().get()
+            if (seriesIds.isNotEmpty()) {
+                entries
+                    .filter { it.mediaId.toString() in seriesIds && !it.hasAired() }
+                    .forEach { mihon.feature.airingschedule.notification.ScheduleNotifications.ensureScheduled(context, it) }
+            }
+
             schedulePrefs.scheduleLastAutoRefresh().set(System.currentTimeMillis())
             Result.success()
         } catch (_: Exception) {
