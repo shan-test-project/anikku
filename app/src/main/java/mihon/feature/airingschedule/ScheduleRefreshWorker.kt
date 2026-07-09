@@ -64,7 +64,13 @@ class ScheduleRefreshWorker(
                 .filter { it.airingAt in windowStart..nowEpoch }
                 .forEach { entry ->
                     val delayMinutes = (nowEpoch - entry.airingAt) / 60L
-                    if (delayMinutes in 0..(24 * 60)) {
+                    // Require at least 15 minutes elapsed before recording. Near-zero values
+                    // almost certainly mean the source hasn't had a chance to upload yet, so
+                    // recording them would skew the running average downward inaccurately.
+                    // This is still an approximation — we check source availability via time
+                    // elapsed rather than querying the source catalog directly, which would
+                    // require source-specific API calls beyond the scope of this worker.
+                    if (delayMinutes in 15L..(24 * 60)) {
                         favoriteSourceIds.forEach { sourceId ->
                             delayTracker.recordObservation(sourceId, delayMinutes)
                         }

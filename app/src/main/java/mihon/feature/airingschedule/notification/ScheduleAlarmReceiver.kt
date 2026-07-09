@@ -51,7 +51,10 @@ class ScheduleAlarmReceiver : BroadcastReceiver() {
             .setContentIntent(pendingContentIntent)
             .build()
 
-        val notificationId = Notifications.ID_AIRING_SCHEDULE_BASE - (kotlin.math.abs(ScheduleNotifications.requestCode(mediaId, episode)) % 10000)
+        // Use bitmasking instead of kotlin.math.abs to safely strip the sign bit.
+        // abs(Int.MIN_VALUE) overflows back to Int.MIN_VALUE, so bitmask is the safe approach.
+        val notificationId = Notifications.ID_AIRING_SCHEDULE_BASE -
+            ((ScheduleNotifications.requestCode(mediaId, episode) and Int.MAX_VALUE) % 10000)
         NotificationManagerCompat.from(context).apply {
             runCatching { notify(notificationId, notification) }
         }
