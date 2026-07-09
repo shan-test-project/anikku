@@ -45,7 +45,7 @@ class ScheduleAlarmReceiver : BroadcastReceiver() {
         val notification = NotificationCompat.Builder(context, Notifications.CHANNEL_AIRING_SCHEDULE)
             .setSmallIcon(R.drawable.ic_komikku)
             .setContentTitle(title)
-            .setContentText("Episode $episode just aired")
+            .setContentText(context.getString(R.string.notification_episode_aired, episode))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .setContentIntent(pendingContentIntent)

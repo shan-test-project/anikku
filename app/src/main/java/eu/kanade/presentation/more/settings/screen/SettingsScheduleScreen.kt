@@ -96,7 +96,7 @@ object SettingsScheduleScreen : SearchableSettings {
 
         return listOf(
             Preference.PreferenceGroup(
-                title = "Auto Refresh",
+                title = stringResource(MR.strings.pref_schedule_auto_refresh_group),
                 preferenceItems = persistentListOf(
                     Preference.PreferenceItem.SwitchPreference(
                         pref = schedulePreferences.scheduleAutoRefreshEnabled(),
@@ -113,7 +113,7 @@ object SettingsScheduleScreen : SearchableSettings {
                 ),
             ),
             Preference.PreferenceGroup(
-                title = "Favorite Sources",
+                title = stringResource(MR.strings.pref_schedule_sources_title),
                 preferenceItems = persistentListOf(
                     Preference.PreferenceItem.MultiSelectListPreference(
                         pref = schedulePreferences.favoriteSourceIds(),
@@ -139,7 +139,7 @@ object SettingsScheduleScreen : SearchableSettings {
                 ),
             ),
             Preference.PreferenceGroup(
-                title = "Upload Delay Tracking",
+                title = stringResource(MR.strings.pref_schedule_upload_delay_group),
                 preferenceItems = persistentListOf(
                     Preference.PreferenceItem.SwitchPreference(
                         pref = schedulePreferences.uploadDelayEnabled(),
@@ -155,7 +155,7 @@ object SettingsScheduleScreen : SearchableSettings {
                 ),
             ),
             Preference.PreferenceGroup(
-                title = "Display",
+                title = stringResource(MR.strings.pref_schedule_display_group),
                 preferenceItems = persistentListOf(
                     Preference.PreferenceItem.ListPreference(
                         pref = schedulePreferences.titleLanguage(),

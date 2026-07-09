@@ -136,10 +136,10 @@ data object AiringScheduleTab : Tab {
                     },
                     actions = {
                         IconButton(onClick = { screenModel.loadSchedule() }) {
-                            Icon(Icons.Outlined.Refresh, contentDescription = "Refresh")
+                            Icon(Icons.Outlined.Refresh, contentDescription = stringResource(MR.strings.cd_refresh_schedule))
                         }
                         IconButton(onClick = { navigator.push(SettingsScheduleScreen) }) {
-                            Icon(Icons.Outlined.Settings, contentDescription = "Schedule settings")
+                            Icon(Icons.Outlined.Settings, contentDescription = stringResource(MR.strings.cd_schedule_settings))
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -349,7 +349,7 @@ private fun ScheduleErrorContent(
             modifier = Modifier.fillMaxWidth().padding(32.dp),
         ) {
             Text(
-                text = "Unable to load schedule",
+                text = stringResource(MR.strings.schedule_error_title),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 textAlign = TextAlign.Center,
