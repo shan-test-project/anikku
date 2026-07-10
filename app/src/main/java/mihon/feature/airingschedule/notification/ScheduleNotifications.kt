@@ -129,4 +129,10 @@ object ScheduleNotifications {
     fun cancelAllForMedia(context: Context, mediaId: Int, entries: List<AiringScheduleEntry>) {
         entries.filter { it.mediaId == mediaId }.forEach { cancel(context, it) }
     }
+
+    /** Removes the persisted alarm key for an already-fired alarm (receiver path). */
+    fun removeAlarmKey(mediaId: Int, episode: Int) = withKeysLock {
+        val key = alarmKey(mediaId, episode)
+        schedulePreferences.scheduledAlarmKeys().set(schedulePreferences.scheduledAlarmKeys().get() - key)
+    }
 }

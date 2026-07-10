@@ -17,7 +17,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
-import mihon.feature.airingschedule.SchedulePreferences
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 
@@ -35,12 +34,9 @@ class ScheduleAlarmReceiver : BroadcastReceiver() {
         val coverUrl = intent.getStringExtra(EXTRA_COVER_URL)
         if (mediaId == -1 || episode == -1) return
 
-        val schedulePreferences: SchedulePreferences = Injekt.get()
-        val key = ScheduleNotifications.alarmKey(mediaId, episode)
-        // Remove the alarm key from the scheduled set first, on the main thread, before the
-        // async notification work. This is kept short to avoid blocking the receiver; the
-        // ScheduleNotifications object ensures all key-set mutations are serialized.
-        schedulePreferences.scheduledAlarmKeys().set(schedulePreferences.scheduledAlarmKeys().get() - key)
+        // Remove the alarm key from the scheduled set first, before the async notification work.
+        // All key-set mutations go through ScheduleNotifications so they are serialized.
+        ScheduleNotifications.removeAlarmKey(mediaId, episode)
 
         // Cover-art loading is async (network/disk); use goAsync() so the receiver's process
         // isn't killed before the notification is actually posted. goAsync() only grants a
