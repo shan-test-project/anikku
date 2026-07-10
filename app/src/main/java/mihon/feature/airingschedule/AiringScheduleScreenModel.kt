@@ -44,7 +44,15 @@ class AiringScheduleScreenModel : StateScreenModel<AiringScheduleScreenModel.Sta
                 val titles = libraryAnime.map { lib ->
                     lib.anime.title.trim().lowercase()
                 }.toSet()
-                mutableState.update { it.copy(libraryAnimeTitles = titles) }
+                // Maps a lowercased title to the set of source ids that carry it in the
+                // user's library. This is what lets "filter by favorite source" and "filter
+                // by source availability" check a *specific* matched source for a *specific*
+                // anime, instead of a global proxy applied to every entry.
+                val sourcesByTitle = libraryAnime
+                    .groupBy({ it.anime.title.trim().lowercase() }, { it.anime.source.toString() })
+                    .mapValues { it.value.toSet() }
+                mutableState.update { it.copy(libraryAnimeTitles = titles, librarySourcesByTitle = sourcesByTitle) }
+                applyFilters()
             }
         }
     }
@@ -146,30 +154,64 @@ class AiringScheduleScreenModel : StateScreenModel<AiringScheduleScreenModel.Sta
         val titleLang = schedulePrefs.titleLanguage().get()
         val autoAdd = schedulePrefs.autoAddFromPinnedSources().get()
         val pinnedSources = sourcePreferences.pinnedSources().get()
+        val librarySourcesByTitle = mutableState.value.librarySourcesByTitle
         val zone = ZoneId.systemDefault()
+        val nowEpoch = System.currentTimeMillis() / 1000L
 
-        // Pre-compute whether any favourite/pinned source has a tracked upload delay,
-        // which serves as a proxy for "this source type carries schedule anime".
-        val anyFavoriteTracked = favoriteIds.any { it in delays }
-        val priorityDelay = getPriorityDelay(delays, pinnedSources, favoriteIds)
+        // Per-entry: the actual favourite/pinned source ids that carry *this specific* anime,
+        // resolved via the library-anime title match (bounded to anime the user already added —
+        // we can't check every source's full catalogue for every scheduled anime without being
+        // far too slow, so this only reports "confirmed on a favourite source" for library anime).
+        fun matchedSourcesFor(entry: AiringScheduleEntry): Set<String> {
+            val titleCandidates = listOfNotNull(
+                entry.titleUserPreferred,
+                entry.titleEnglish,
+                entry.titleRomaji,
+                entry.titleNative,
+            ).map { it.trim().lowercase() }
+            val candidateSources = titleCandidates.flatMap { librarySourcesByTitle[it].orEmpty() }.toSet()
+            return candidateSources.intersect(favoriteIds + pinnedSources)
+        }
+
+        // Per-entry: the delay-adjusted air time using only that entry's own matched sources
+        // (pinned sources take priority over plain favourites), instead of one global delay
+        // applied to every unrelated entry.
+        fun priorityDelayFor(matchedSources: Set<String>): Long? {
+            if (delays.isEmpty() || matchedSources.isEmpty()) return null
+            for (sourceId in pinnedSources) {
+                if (sourceId in matchedSources) delays[sourceId]?.let { return it }
+            }
+            for (sourceId in favoriteIds) {
+                if (sourceId in matchedSources) delays[sourceId]?.let { return it }
+            }
+            return null
+        }
 
         val filtered = entries.filter { entry ->
             // Re-apply adult-content filter in case the preference changed since last fetch.
             if (!showAdult && entry.isAdult) return@filter false
             // Source filters only apply when the user has configured favourite sources.
-            if (favoriteIds.isNotEmpty()) {
-                // showOnlyFavoriteSources: keep entries only when at least one favourite
-                // source has a tracked upload delay (proxy: it carries schedule-type anime).
-                if (showOnlyFavorites && !anyFavoriteTracked) return@filter false
-                // filterBySourceAvailability: keep entries only when a priority delay can
-                // be resolved, meaning at least one pinned/favourite source is known to
-                // upload schedule-type anime.
-                if (filterByAvailability && priorityDelay == null) return@filter false
+            if (favoriteIds.isNotEmpty() && (showOnlyFavorites || filterByAvailability)) {
+                val matchedSources = matchedSourcesFor(entry)
+                // showOnlyFavoriteSources: keep entries only when this specific anime is
+                // confirmed to be on one of the user's favourite/pinned sources.
+                if (showOnlyFavorites && matchedSources.isEmpty()) return@filter false
+                // filterBySourceAvailability: keep entries only once the matched source's
+                // learned delay says the episode should actually be up by now. Sources with
+                // no learned delay yet are treated as available immediately at air time
+                // (delay 0) rather than excluded outright, since we cannot yet know better.
+                if (filterByAvailability) {
+                    if (matchedSources.isEmpty()) return@filter false
+                    val delay = priorityDelayFor(matchedSources) ?: 0L
+                    if (nowEpoch < entry.airingAt + delay * 60) return@filter false
+                }
             }
             true
         }
 
         val grouped = filtered.groupBy { entry ->
+            val matchedSources = if (favoriteIds.isNotEmpty()) matchedSourcesFor(entry) else emptySet()
+            val priorityDelay = priorityDelayFor(matchedSources)
             val airTime = if (priorityDelay != null) {
                 entry.airingAt + (priorityDelay * 60)
             } else {
@@ -249,26 +291,6 @@ class AiringScheduleScreenModel : StateScreenModel<AiringScheduleScreenModel.Sta
             .forEach { ScheduleNotifications.ensureScheduled(application, it) }
     }
 
-    /**
-     * Returns the delay (minutes) of the highest-priority pinned source that has a known delay.
-     * Priority: first iterate pinned sources (from Browse), then favorite sources.
-     * Falls back to null if none have a known delay.
-     */
-    private fun getPriorityDelay(
-        delays: Map<String, Long>,
-        pinnedSources: Set<String>,
-        favoriteSources: Set<String>,
-    ): Long? {
-        if (delays.isEmpty()) return null
-        for (sourceId in pinnedSources) {
-            delays[sourceId]?.let { return it }
-        }
-        for (sourceId in favoriteSources) {
-            delays[sourceId]?.let { return it }
-        }
-        return null
-    }
-
     fun selectDay(day: DayOfWeek) {
         mutableState.update { it.copy(selectedDay = day) }
     }
@@ -293,5 +315,6 @@ class AiringScheduleScreenModel : StateScreenModel<AiringScheduleScreenModel.Sta
         val notifyOnceMediaIds: Set<String> = emptySet(),
         val notifySeriesMediaIds: Set<String> = emptySet(),
         val libraryAnimeTitles: Set<String> = emptySet(),
+        val librarySourcesByTitle: Map<String, Set<String>> = emptyMap(),
     )
 }

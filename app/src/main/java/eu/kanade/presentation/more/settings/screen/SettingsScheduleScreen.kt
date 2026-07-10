@@ -132,12 +132,12 @@ object SettingsScheduleScreen : SearchableSettings {
                     Preference.PreferenceItem.SwitchPreference(
                         pref = schedulePreferences.showOnlyFavoriteSources(),
                         title = stringResource(MR.strings.pref_schedule_show_only_favorites),
-                        subtitle = stringResource(MR.strings.pref_schedule_show_only_favorites_summary),
+                        subtitle = "Off by default. When on, only shows anime that are already in your library from one of your selected favorite/pinned sources.",
                     ),
                     Preference.PreferenceItem.SwitchPreference(
                         pref = schedulePreferences.filterBySourceAvailability(),
                         title = "Filter by source availability",
-                        subtitle = "Only show anime that your selected favorite sources are likely to carry",
+                        subtitle = "Off by default. When on, only shows episodes once that anime's matched favorite/pinned source has actually made the episode available (using the learned upload delay).",
                     ),
                     Preference.PreferenceItem.SwitchPreference(
                         pref = schedulePreferences.autoAddFromPinnedSources(),
