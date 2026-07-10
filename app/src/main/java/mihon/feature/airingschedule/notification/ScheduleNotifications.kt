@@ -7,6 +7,9 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.runBlocking
 import mihon.feature.airingschedule.AiringScheduleEntry
 import mihon.feature.airingschedule.SchedulePreferences
 import uy.kohesive.injekt.Injekt
@@ -19,6 +22,14 @@ import uy.kohesive.injekt.api.get
 object ScheduleNotifications {
 
     private val schedulePreferences: SchedulePreferences by lazy { Injekt.get() }
+
+    // The persisted "scheduled alarm keys" set is read-modified-written from multiple
+    // independent callers (UI toggle taps, the weekly refresh worker, and the alarm receiver
+    // itself when an alarm fires) which can race and lose updates if not serialized. All
+    // mutating access goes through this mutex.
+    private val keysMutex = Mutex()
+
+    private inline fun <T> withKeysLock(block: () -> T): T = runBlocking { keysMutex.withLock { block() } }
 
     fun alarmKey(mediaId: Int, episode: Int): String = "$mediaId:$episode"
 
@@ -55,13 +66,14 @@ object ScheduleNotifications {
      * episode has already aired and nothing was scheduled — callers must not persist a
      * "notify" preference in that case since no alarm backs it.
      */
-    fun ensureScheduled(context: Context, entry: AiringScheduleEntry): Boolean {
-        if (entry.hasAired()) return false
+    fun ensureScheduled(context: Context, entry: AiringScheduleEntry): Boolean = withKeysLock {
+        if (entry.hasAired()) return@withKeysLock false
         val key = alarmKey(entry.mediaId, entry.episode)
         val scheduled = schedulePreferences.scheduledAlarmKeys().get()
-        if (key in scheduled) return true
+        if (key in scheduled) return@withKeysLock true
 
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return false
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+            ?: return@withKeysLock false
         val intent = Intent(context, ScheduleAlarmReceiver::class.java).apply {
             putExtra(ScheduleAlarmReceiver.EXTRA_MEDIA_ID, entry.mediaId)
             putExtra(ScheduleAlarmReceiver.EXTRA_EPISODE, entry.episode)
@@ -76,7 +88,7 @@ object ScheduleNotifications {
         )
 
         val triggerAtMillis = entry.airingAt * 1000L
-        return runCatching {
+        runCatching {
             if (canScheduleExactAlarms(context)) {
                 // Fires at the precise millisecond even in Doze/App Standby, regardless of
                 // whether the user has disallowed background battery usage for the app —
@@ -88,16 +100,20 @@ object ScheduleNotifications {
                 alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
             }
             // Only persist the key after a successful registration so that a future call
-            // can retry if the platform rejected the alarm.
-            schedulePreferences.scheduledAlarmKeys().set(scheduled + key)
+            // can retry if the platform rejected the alarm. Re-read the current set under
+            // the lock rather than reusing the stale `scheduled` snapshot, since another
+            // caller could have mutated it while the alarm was being registered.
+            val current = schedulePreferences.scheduledAlarmKeys().get()
+            schedulePreferences.scheduledAlarmKeys().set(current + key)
             true
         }.getOrDefault(false)
     }
 
     /** Cancels a single previously-scheduled alarm for [entry], if any. */
-    fun cancel(context: Context, entry: AiringScheduleEntry) {
+    fun cancel(context: Context, entry: AiringScheduleEntry) = withKeysLock {
         val key = alarmKey(entry.mediaId, entry.episode)
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+            ?: return@withKeysLock
         val intent = Intent(context, ScheduleAlarmReceiver::class.java)
         val pendingIntent = PendingIntent.getBroadcast(
             context,

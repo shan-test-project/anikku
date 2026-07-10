@@ -86,6 +86,12 @@ class ScheduleRefreshWorker(
             }
 
             val observations = mutableListOf<Pair<String, Long>>()
+            // Avoid re-fetching the same source episode list within a single run and cap total
+            // source calls so large libraries can't make the background worker exceed its
+            // WorkManager window. This is a soft cap; the per-source observations are still
+            // written so the learning keeps improving over subsequent runs.
+            val alreadyQueriedSources = mutableSetOf<Long>()
+            var sourceCallsThisRun = 0
             for (entry in airedEntries) {
                 val titleCandidates = listOfNotNull(
                     entry.titleUserPreferred,
@@ -96,6 +102,10 @@ class ScheduleRefreshWorker(
 
                 val matches = libraryAnime.filter { it.title.trim().lowercase() in titleCandidates }
                 for (anime in matches) {
+                    if (!alreadyQueriedSources.add(anime.source)) continue
+                    if (sourceCallsThisRun >= MAX_SOURCE_CALLS_PER_RUN) break
+                    sourceCallsThisRun++
+
                     val source = sourceManager.get(anime.source) ?: continue
                     val episodes = runCatching { source.getEpisodeList(anime.toSAnime()) }.getOrNull() ?: continue
                     val matchingEpisode = episodes.firstOrNull { abs(it.episode_number - entry.episode) < 0.01f }
@@ -111,6 +121,7 @@ class ScheduleRefreshWorker(
                         observations.add(anime.source.toString() to delayMinutes)
                     }
                 }
+                if (sourceCallsThisRun >= MAX_SOURCE_CALLS_PER_RUN) break
             }
             delayTracker.recordObservations(observations)
 
@@ -123,6 +134,7 @@ class ScheduleRefreshWorker(
 
     companion object {
         private const val WORK_NAME = "ScheduleRefreshWorker"
+        private const val MAX_SOURCE_CALLS_PER_RUN = 12
 
         fun schedule(context: Context, interval: SchedulePreferences.UploadDelayInterval) {
             val wm = WorkManager.getInstance(context)

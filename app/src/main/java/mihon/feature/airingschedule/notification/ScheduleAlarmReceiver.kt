@@ -16,6 +16,7 @@ import eu.kanade.tachiyomi.util.system.notify
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import mihon.feature.airingschedule.SchedulePreferences
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
@@ -36,16 +37,27 @@ class ScheduleAlarmReceiver : BroadcastReceiver() {
 
         val schedulePreferences: SchedulePreferences = Injekt.get()
         val key = ScheduleNotifications.alarmKey(mediaId, episode)
+        // Remove the alarm key from the scheduled set first, on the main thread, before the
+        // async notification work. This is kept short to avoid blocking the receiver; the
+        // ScheduleNotifications object ensures all key-set mutations are serialized.
         schedulePreferences.scheduledAlarmKeys().set(schedulePreferences.scheduledAlarmKeys().get() - key)
 
         // Cover-art loading is async (network/disk); use goAsync() so the receiver's process
-        // isn't killed before the notification is actually posted.
+        // isn't killed before the notification is actually posted. goAsync() only grants a
+        // short (~10s) execution window before the OS may kill the process, so the cover
+        // fetch is capped well under that and the notification is always posted — with or
+        // without the cover — inside a try/finally so pendingResult.finish() is never skipped.
         val pendingResult = goAsync()
         val appContext = context.applicationContext
         CoroutineScope(Dispatchers.IO).launch {
-            val coverBitmap = coverUrl?.let { loadCoverBitmap(appContext, it) }
-            postNotification(appContext, mediaId, episode, title, coverBitmap)
-            pendingResult.finish()
+            try {
+                val coverBitmap = coverUrl?.let {
+                    withTimeoutOrNull(COVER_LOAD_TIMEOUT_MS) { loadCoverBitmap(appContext, it) }
+                }
+                postNotification(appContext, mediaId, episode, title, coverBitmap)
+            } finally {
+                pendingResult.finish()
+            }
         }
     }
 
@@ -102,5 +114,6 @@ class ScheduleAlarmReceiver : BroadcastReceiver() {
         const val EXTRA_EPISODE = "episode"
         const val EXTRA_TITLE = "title"
         const val EXTRA_COVER_URL = "cover_url"
+        private const val COVER_LOAD_TIMEOUT_MS = 6_000L
     }
 }
