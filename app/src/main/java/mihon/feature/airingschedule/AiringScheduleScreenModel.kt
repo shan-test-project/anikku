@@ -142,6 +142,102 @@ class AiringScheduleScreenModel : StateScreenModel<AiringScheduleScreenModel.Sta
         }
     }
 
+    /**
+     * Manual override: when the user has picked "Custom" for the upload-delay refresh interval,
+     * they've supplied a fixed delay themselves — that takes priority over any auto-learned
+     * per-source delay when computing expected upload time / countdown.
+     */
+    private fun computeManualDelayMinutes(): Long? {
+        if (!schedulePrefs.uploadDelayEnabled().get()) return null
+        if (schedulePrefs.uploadDelayRefreshInterval().get() != SchedulePreferences.UploadDelayInterval.CUSTOM) {
+            return null
+        }
+        return SchedulePreferences.parseCustomDelayMinutes(schedulePrefs.customUploadDelayMinutes().get())
+    }
+
+    /**
+     * The actual favourite/pinned source ids that carry *this specific* anime, resolved via the
+     * library-anime title match (bounded to anime the user already added — we can't check every
+     * source's full catalogue for every scheduled anime without being far too slow, so this only
+     * reports "confirmed on a favourite source" for library anime).
+     */
+    private fun matchedSourcesFor(
+        entry: AiringScheduleEntry,
+        configuredSources: Set<String>,
+        librarySourcesByTitle: Map<String, Set<String>>,
+    ): Set<String> {
+        val titleCandidates = listOfNotNull(
+            entry.titleUserPreferred,
+            entry.titleEnglish,
+            entry.titleRomaji,
+            entry.titleNative,
+        ).map { it.trim().lowercase() }
+        val candidateSources = titleCandidates.flatMap { librarySourcesByTitle[it].orEmpty() }.toSet()
+        return candidateSources.intersect(configuredSources)
+    }
+
+    /**
+     * The delay-adjusted air time using only that entry's own matched sources (pinned sources
+     * take priority over plain favourites, unless a manual override is active), instead of one
+     * global delay applied to every unrelated entry.
+     */
+    private fun priorityDelayFor(
+        matchedSources: Set<String>,
+        manualDelayMinutes: Long?,
+        delays: Map<String, Long>,
+        pinnedSources: Set<String>,
+        favoriteIds: Set<String>,
+    ): Long? {
+        manualDelayMinutes?.let { return it }
+        if (delays.isEmpty() || matchedSources.isEmpty()) return null
+        for (sourceId in pinnedSources) {
+            if (sourceId in matchedSources) delays[sourceId]?.let { return it }
+        }
+        for (sourceId in favoriteIds) {
+            if (sourceId in matchedSources) delays[sourceId]?.let { return it }
+        }
+        return null
+    }
+
+    private fun filterEntries(
+        entries: List<AiringScheduleEntry>,
+        showAdult: Boolean,
+        showOnlyFavorites: Boolean,
+        configuredSources: Set<String>,
+        librarySourcesByTitle: Map<String, Set<String>>,
+    ): List<AiringScheduleEntry> = entries.filter { entry ->
+        // Re-apply adult-content filter in case the preference changed since last fetch.
+        if (!showAdult && entry.isAdult) return@filter false
+        // Source filters only apply when the user has configured favourite/pinned sources.
+        if (configuredSources.isNotEmpty() && showOnlyFavorites) {
+            val matchedSources = matchedSourcesFor(entry, configuredSources, librarySourcesByTitle)
+            // showOnlyFavoriteSources: keep entries only when this specific anime is
+            // confirmed to be on one of the user's favourite/pinned sources.
+            if (matchedSources.isEmpty()) return@filter false
+        }
+        true
+    }
+
+    private fun groupByDelayAdjustedDay(
+        entries: List<AiringScheduleEntry>,
+        configuredSources: Set<String>,
+        librarySourcesByTitle: Map<String, Set<String>>,
+        manualDelayMinutes: Long?,
+        delays: Map<String, Long>,
+        pinnedSources: Set<String>,
+        favoriteIds: Set<String>,
+        zone: ZoneId,
+    ): Map<DayOfWeek, List<AiringScheduleEntry>> = entries.groupBy { entry ->
+        val matchedSources = if (configuredSources.isNotEmpty()) {
+            matchedSourcesFor(entry, configuredSources, librarySourcesByTitle)
+        } else {
+            emptySet()
+        }
+        val priorityDelay = priorityDelayFor(matchedSources, manualDelayMinutes, delays, pinnedSources, favoriteIds)
+        val airTime = if (priorityDelay != null) entry.airingAt + (priorityDelay * 60) else entry.airingAt
+        ZonedDateTime.ofInstant(Instant.ofEpochSecond(airTime), zone).dayOfWeek
+    }
+
     private fun applyFilters(
         entries: List<AiringScheduleEntry> = allEntries,
         delays: Map<String, Long> = if (schedulePrefs.uploadDelayEnabled().get()) uploadDelayTracker.getDelays() else emptyMap(),
@@ -155,76 +251,23 @@ class AiringScheduleScreenModel : StateScreenModel<AiringScheduleScreenModel.Sta
         val autoAdd = schedulePrefs.autoAddFromPinnedSources().get()
         val pinnedSources = sourcePreferences.pinnedSources().get()
         val librarySourcesByTitle = mutableState.value.librarySourcesByTitle
-        val zone = ZoneId.systemDefault()
-        // Manual override: when the user has picked "Custom" for the upload-delay refresh
-        // interval, they've supplied a fixed delay themselves — that takes priority over any
-        // auto-learned per-source delay when computing expected upload time / countdown.
-        val manualDelayMinutes: Long? = if (
-            schedulePrefs.uploadDelayEnabled().get() &&
-            schedulePrefs.uploadDelayRefreshInterval().get() == SchedulePreferences.UploadDelayInterval.CUSTOM
-        ) {
-            SchedulePreferences.parseCustomDelayMinutes(schedulePrefs.customUploadDelayMinutes().get())
-        } else {
-            null
-        }
+        val manualDelayMinutes = computeManualDelayMinutes()
         // Source filters should apply for either favourite or pinned sources — a user who
         // only pins sources from Browse (without also marking them "favourite" here) still
         // expects "show only my sources" to work.
         val configuredSources = favoriteIds + pinnedSources
 
-        // Per-entry: the actual favourite/pinned source ids that carry *this specific* anime,
-        // resolved via the library-anime title match (bounded to anime the user already added —
-        // we can't check every source's full catalogue for every scheduled anime without being
-        // far too slow, so this only reports "confirmed on a favourite source" for library anime).
-        fun matchedSourcesFor(entry: AiringScheduleEntry): Set<String> {
-            val titleCandidates = listOfNotNull(
-                entry.titleUserPreferred,
-                entry.titleEnglish,
-                entry.titleRomaji,
-                entry.titleNative,
-            ).map { it.trim().lowercase() }
-            val candidateSources = titleCandidates.flatMap { librarySourcesByTitle[it].orEmpty() }.toSet()
-            return candidateSources.intersect(configuredSources)
-        }
-
-        // Per-entry: the delay-adjusted air time using only that entry's own matched sources
-        // (pinned sources take priority over plain favourites), instead of one global delay
-        // applied to every unrelated entry.
-        fun priorityDelayFor(matchedSources: Set<String>): Long? {
-            manualDelayMinutes?.let { return it }
-            if (delays.isEmpty() || matchedSources.isEmpty()) return null
-            for (sourceId in pinnedSources) {
-                if (sourceId in matchedSources) delays[sourceId]?.let { return it }
-            }
-            for (sourceId in favoriteIds) {
-                if (sourceId in matchedSources) delays[sourceId]?.let { return it }
-            }
-            return null
-        }
-
-        val filtered = entries.filter { entry ->
-            // Re-apply adult-content filter in case the preference changed since last fetch.
-            if (!showAdult && entry.isAdult) return@filter false
-            // Source filters only apply when the user has configured favourite/pinned sources.
-            if (configuredSources.isNotEmpty() && showOnlyFavorites) {
-                val matchedSources = matchedSourcesFor(entry)
-                // showOnlyFavoriteSources: keep entries only when this specific anime is
-                // confirmed to be on one of the user's favourite/pinned sources.
-                if (matchedSources.isEmpty()) return@filter false
-            }
-            true
-        }
-
-        val grouped = filtered.groupBy { entry ->
-            val matchedSources = if (configuredSources.isNotEmpty()) matchedSourcesFor(entry) else emptySet()
-            val priorityDelay = priorityDelayFor(matchedSources)
-            val airTime = if (priorityDelay != null) {
-                entry.airingAt + (priorityDelay * 60)
-            } else {
-                entry.airingAt
-            }
-            ZonedDateTime.ofInstant(Instant.ofEpochSecond(airTime), zone).dayOfWeek
-        }
+        val filtered = filterEntries(entries, showAdult, showOnlyFavorites, configuredSources, librarySourcesByTitle)
+        val grouped = groupByDelayAdjustedDay(
+            entries = filtered,
+            configuredSources = configuredSources,
+            librarySourcesByTitle = librarySourcesByTitle,
+            manualDelayMinutes = manualDelayMinutes,
+            delays = delays,
+            pinnedSources = pinnedSources,
+            favoriteIds = favoriteIds,
+            zone = ZoneId.systemDefault(),
+        )
 
         mutableState.update {
             it.copy(
