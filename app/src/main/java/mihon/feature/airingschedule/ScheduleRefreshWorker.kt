@@ -106,7 +106,7 @@ class ScheduleRefreshWorker(
      * background worker exceed its WorkManager window. This is a soft cap; the per-source
      * observations are still written so the learning keeps improving over subsequent runs.
      */
-    private fun collectDelayObservations(
+    private suspend fun collectDelayObservations(
         airedEntries: List<AiringScheduleEntry>,
         libraryAnime: List<Anime>,
     ): List<Pair<String, Long>> {
@@ -145,7 +145,7 @@ class ScheduleRefreshWorker(
     }
 
     /** Fetches [anime]'s real episode list from its source and returns a plausible delay in minutes, if any. */
-    private fun observeUploadDelay(
+    private suspend fun observeUploadDelay(
         sourceManager: SourceManager,
         anime: Anime,
         entry: AiringScheduleEntry,
