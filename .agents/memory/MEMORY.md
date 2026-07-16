@@ -1,1 +1,0 @@
-- [Airing schedule feature reality](schedule-feature-reality.md) — which schedule features actually work and which are placeholder logic.
