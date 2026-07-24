@@ -54,6 +54,13 @@ object Notifications {
     const val GROUP_NEW_EPISODES = "eu.kanade.tachiyomi.NEW_EPISODES"
 
     /**
+     * Notification channel and ids used by the Airing Schedule episode alerts.
+     * Each fired episode gets its own ID derived from (animeTitle.hashCode * 31 + episodeNum).
+     */
+    const val CHANNEL_AIRING_EPISODES = "airing_episodes_channel"
+    const val GROUP_AIRING_EPISODES = "eu.kanade.tachiyomi.AIRING_EPISODES"
+
+    /**
      * Notification channel and ids used by the backup/restore system.
      */
     private const val GROUP_BACKUP_RESTORE = "group_backup_restore"
@@ -160,6 +167,10 @@ object Notifications {
                 },
                 buildNotificationChannel(CHANNEL_NEW_CHAPTERS_EPISODES, IMPORTANCE_DEFAULT) {
                     setName(context.stringResource(MR.strings.channel_new_chapters_episodes))
+                },
+                buildNotificationChannel(CHANNEL_AIRING_EPISODES, IMPORTANCE_HIGH) {
+                    setName("Airing Schedule – Episode Alerts")
+                    setDescription("Heads-up notifications when a scheduled episode has just aired")
                 },
                 buildNotificationChannel(CHANNEL_DOWNLOADER_PROGRESS, IMPORTANCE_LOW) {
                     setName(context.stringResource(MR.strings.channel_progress))
