@@ -56,16 +56,21 @@ jobs:
           echo '{}' > app/src/main/assets/client_secrets.json
 
       - name: Build armeabi-v7a release APK (unsigned)
-        run: ./gradlew assembleArmeabiV7aRelease --no-daemon --stacktrace
+        run: |
+          ./gradlew assembleRelease \
+            -Pandroid.injected.abis=armeabi-v7a \
+            --no-daemon --stacktrace
         env:
           GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4g"
 
-      - name: Rename APK
+      - name: Collect and rename APK
         run: |
-          APK=$(find app/build/outputs/apk/armeabiV7a/release -name "*.apk" | head -1)
+          APK=$(find app/build/outputs/apk/release -name "*armeabi-v7a*.apk" | head -1)
+          [ -z "$APK" ] && APK=$(find app/build/outputs/apk/release -name "*.apk" | head -1)
           DEST="Anikku-armeabi-v7a-${{ github.event.inputs.version_name }}-unsigned.apk"
           cp "$APK" "$DEST"
           echo "APK_NAME=$DEST" >> $GITHUB_ENV
+          sha256sum "$DEST"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
