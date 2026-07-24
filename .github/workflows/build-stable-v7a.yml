@@ -34,9 +34,12 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Remove Nix-specific Java home from gradle.properties
+        run: sed -i '/org\.gradle\.java\.home/d' gradle.properties
+
       - name: Write stub google-services.json
         run: |
-          cat > app/google-services.json <<'EOF'
+          cat > app/google-services.json << 'EOF'
           {
             "project_info": { "project_id": "stub", "project_number": "0" },
             "client": [{
@@ -60,8 +63,9 @@ jobs:
       - name: Rename APK
         run: |
           APK=$(find app/build/outputs/apk/armeabiV7a/release -name "*.apk" | head -1)
-          cp "$APK" "Anikku-armeabi-v7a-${{ github.event.inputs.version_name }}-unsigned.apk"
-          echo "APK_NAME=Anikku-armeabi-v7a-${{ github.event.inputs.version_name }}-unsigned.apk" >> $GITHUB_ENV
+          DEST="Anikku-armeabi-v7a-${{ github.event.inputs.version_name }}-unsigned.apk"
+          cp "$APK" "$DEST"
+          echo "APK_NAME=$DEST" >> $GITHUB_ENV
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
