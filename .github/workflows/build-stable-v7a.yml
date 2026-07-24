@@ -34,8 +34,15 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Remove Nix-specific Java home from gradle.properties
-        run: sed -i '/org\.gradle\.java\.home/d' gradle.properties
+      - name: Patch gradle.properties for CI
+        run: |
+          # Remove Nix-specific Java home (invalid on Ubuntu runner)
+          sed -i '/org\.gradle\.java\.home/d' gradle.properties
+          # Extend HTTP timeouts so Maven Central doesn't time out on a slow runner
+          echo "systemProp.http.socketTimeout=120000"      >> gradle.properties
+          echo "systemProp.http.connectionTimeout=120000"  >> gradle.properties
+          echo "systemProp.https.socketTimeout=120000"     >> gradle.properties
+          echo "systemProp.https.connectionTimeout=120000" >> gradle.properties
 
       - name: Write stub google-services.json
         run: |
@@ -55,11 +62,16 @@ jobs:
           mkdir -p app/src/main/assets
           echo '{}' > app/src/main/assets/client_secrets.json
 
-      - name: Build armeabi-v7a release APK (unsigned)
-        run: |
-          ./gradlew assembleRelease \
-            -Pandroid.injected.abis=armeabi-v7a \
-            --no-daemon --stacktrace
+      - name: Build armeabi-v7a release APK (unsigned, with retry)
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          retry_wait_seconds: 30
+          command: |
+            ./gradlew assembleRelease \
+              -Pandroid.injected.abis=armeabi-v7a \
+              --no-daemon --stacktrace
         env:
           GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4g"
 
