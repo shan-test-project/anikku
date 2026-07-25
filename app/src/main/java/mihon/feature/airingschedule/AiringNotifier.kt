@@ -8,7 +8,6 @@ import androidx.core.app.NotificationCompat
 import coil3.asDrawable
 import coil3.imageLoader
 import coil3.request.ImageRequest
-import coil3.transform.RoundedCornersTransformation
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.notification.Notifications
 import eu.kanade.tachiyomi.ui.main.MainActivity
@@ -22,7 +21,7 @@ import eu.kanade.tachiyomi.util.system.notify
  *
  * Visual design:
  *  - Collapsed  : title + "Episode N just aired" + high-res thumbnail on the right.
- *  - Expanded   : full-width BigPicture of the anime cover (512 × 768 px, rounded corners).
+ *  - Expanded   : full-width BigPicture of the anime cover (512 × 768 px).
  *  - Accent bar : app primary green tint on the small icon.
  *  - Priority   : HIGH so Android shows it as a heads-up popup.
  */
@@ -90,7 +89,6 @@ class AiringNotifier(private val context: Context) {
         val request = ImageRequest.Builder(context)
             .data(url)
             .size(COVER_WIDTH_PX, COVER_HEIGHT_PX)
-            .transformations(RoundedCornersTransformation(COVER_CORNER_RADIUS_PX))
             .build()
         val drawable = context.imageLoader.execute(request).image
             ?.asDrawable(context.resources)
@@ -117,8 +115,5 @@ class AiringNotifier(private val context: Context) {
 
         /** Height kept at 3:2 portrait ratio — looks good in the expanded banner. */
         private const val COVER_HEIGHT_PX = 768
-
-        /** Corner radius applied to the cover bitmap (in pixels). */
-        private const val COVER_CORNER_RADIUS_PX = 16f
     }
 }
