@@ -1384,5 +1384,10 @@
     <string name="download_speed_limit">Chapter download speed limit</string>
     <string name="download_speed_limit_hint">Set to 0 to disable the speed limit.</string>
     <!-- Airing Schedule settings -->
+    <string name="pref_category_schedule">Schedule</string>
+    <string name="pref_schedule_favorite_sources">Favorite sources</string>
+    <string name="pref_schedule_favorite_sources_summary">Sources shown first for each airing anime</string>
+    <string name="pref_schedule_show_only_favorites">Show only favorite sources</string>
+    <string name="pref_schedule_show_only_favorites_summary">Hide anime whose sources are not in your favorites</string>
     <string name="pref_schedule_about_title">About the schedule</string>
 </resources>
