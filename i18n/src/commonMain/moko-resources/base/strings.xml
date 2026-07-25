@@ -1383,4 +1383,6 @@
     <string name="onboarding_storage_action_create_folder">Create default Aniyomi folder</string>
     <string name="download_speed_limit">Chapter download speed limit</string>
     <string name="download_speed_limit_hint">Set to 0 to disable the speed limit.</string>
+    <!-- Airing Schedule settings -->
+    <string name="pref_schedule_about_title">About the schedule</string>
 </resources>
