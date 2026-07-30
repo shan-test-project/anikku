@@ -84,15 +84,20 @@ fun ScheduleAnimeCard(
         null
     }
 
+    val adjustedAiringAt: Long = priorityDelay
+        ?.let { UploadDelayTracker.adjustedAirTime(entry.airingAt, it) }
+        ?: entry.airingAt
+
     val expectedUploadTime: String? = priorityDelay?.let {
-        val adjusted = UploadDelayTracker.adjustedAirTime(entry.airingAt, it)
-        Instant.ofEpochSecond(adjusted).atZone(zone).format(timeFormatter12h)
+        Instant.ofEpochSecond(adjustedAiringAt).atZone(zone).format(timeFormatter12h)
     }
 
-    var countdown by remember { mutableStateOf(formatCountdown(entry.airingAt)) }
-    LaunchedEffect(entry.airingAt) {
-        while (!entry.hasAired()) {
-            countdown = formatCountdown(entry.airingAt)
+    // The countdown ticks down to the *adjusted* expected upload time, not the raw AniList
+    // broadcast time, so the red badge stays accurate when a source is typically delayed.
+    var countdown by remember { mutableStateOf(formatCountdown(adjustedAiringAt)) }
+    LaunchedEffect(adjustedAiringAt) {
+        while (formatCountdown(adjustedAiringAt) != null) {
+            countdown = formatCountdown(adjustedAiringAt)
             delay(60_000L)
         }
         countdown = null
