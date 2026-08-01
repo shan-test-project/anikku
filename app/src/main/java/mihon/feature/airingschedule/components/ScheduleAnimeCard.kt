@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.Search
@@ -54,9 +56,11 @@ fun ScheduleAnimeCard(
     entry: AiringScheduleEntry,
     titleLanguage: SchedulePreferences.TitleLanguage,
     sourceDelays: Map<String, Long>,
+    manualDelayMinutes: Long?,
     favoriteSourceIds: Set<String>,
     pinnedSourceIds: Set<String>,
     autoAddFromPinnedSources: Boolean,
+    isInLibrary: Boolean,
     notifyState: BellNotifyState,
     onSearchClick: (String) -> Unit,
     onAddToLibraryClick: (String) -> Unit,
@@ -66,35 +70,28 @@ fun ScheduleAnimeCard(
 ) {
     val zone = ZoneId.systemDefault()
     val displayTitle = entry.displayTitle(titleLanguage)
+    val hasAired = entry.hasAired()
 
     val officialAirTime = Instant.ofEpochSecond(entry.airingAt)
         .atZone(zone)
         .format(timeFormatter12h)
 
-    val hasAired = entry.hasAired()
-
-    val priorityDelay: Long? = remember(sourceDelays, pinnedSourceIds, favoriteSourceIds) {
-        if (sourceDelays.isEmpty()) return@remember null
-        for (id in pinnedSourceIds) {
-            sourceDelays[id]?.let { return@remember it }
-        }
-        for (id in favoriteSourceIds) {
-            sourceDelays[id]?.let { return@remember it }
-        }
-        null
+    // A user-supplied custom delay (Refresh interval → Custom) overrides the auto-learned
+    // per-source delay when computing the expected upload time and countdown.
+    val effectiveDelay: Long? = remember(manualDelayMinutes, sourceDelays, pinnedSourceIds, favoriteSourceIds) {
+        manualDelayMinutes
+            ?: pinnedSourceIds.firstNotNullOfOrNull { sourceDelays[it] }
+            ?: favoriteSourceIds.firstNotNullOfOrNull { sourceDelays[it] }
     }
 
-    val adjustedAiringAt: Long = priorityDelay
-        ?.let { UploadDelayTracker.adjustedAirTime(entry.airingAt, it) }
+    val adjustedAiringAt = effectiveDelay?.let { UploadDelayTracker.adjustedAirTime(entry.airingAt, it) }
         ?: entry.airingAt
 
-    val expectedUploadTime: String? = priorityDelay?.let {
+    val expectedUploadTime: String? = effectiveDelay?.let {
         Instant.ofEpochSecond(adjustedAiringAt).atZone(zone).format(timeFormatter12h)
     }
 
-    // The countdown ticks down to the *adjusted* expected upload time, not the raw AniList
-    // broadcast time, so the red badge stays accurate when a source is typically delayed.
-    var countdown by remember { mutableStateOf(formatCountdown(adjustedAiringAt)) }
+    var countdown by remember(adjustedAiringAt) { mutableStateOf(formatCountdown(adjustedAiringAt)) }
     LaunchedEffect(adjustedAiringAt) {
         while (formatCountdown(adjustedAiringAt) != null) {
             countdown = formatCountdown(adjustedAiringAt)
@@ -118,178 +115,260 @@ fun ScheduleAnimeCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Box {
-                AsyncImage(
-                    model = entry.coverImageUrl,
-                    contentDescription = displayTitle,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(width = 56.dp, height = 80.dp)
-                        .clip(RoundedCornerShape(10.dp)),
-                )
-                if (entry.isAdult) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .clip(RoundedCornerShape(bottomStart = 6.dp))
-                            .background(MaterialTheme.colorScheme.error)
-                            .padding(horizontal = 3.dp, vertical = 1.dp),
-                    ) {
-                        Text(
-                            text = "18+",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onError,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
-                }
-            }
+            ScheduleAnimeCover(
+                coverUrl = entry.coverImageUrl,
+                title = displayTitle,
+                isAdult = entry.isAdult,
+            )
 
-            Column(
+            ScheduleAnimeInfo(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Text(
-                    text = displayTitle,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = if (hasAired) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
-                    ) {
-                        Text(
-                            text = if (hasAired) "Aired $officialAirTime" else officialAirTime,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = if (hasAired) MaterialTheme.colorScheme.onTertiary else MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        )
-                    }
-
-                    if (!hasAired && countdown != null) {
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = MaterialTheme.colorScheme.errorContainer,
-                        ) {
-                            Text(
-                                text = "in $countdown",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onErrorContainer,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                            )
-                        }
-                    }
-
-                    if (expectedUploadTime != null && expectedUploadTime != officialAirTime) {
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = MaterialTheme.colorScheme.secondaryContainer,
-                        ) {
-                            Text(
-                                text = "Src ~$expectedUploadTime",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                            )
-                        }
-                    }
-
-                    val episodeText = if (entry.totalEpisodes != null) {
-                        "Ep ${entry.episode} / ${entry.totalEpisodes}"
-                    } else {
-                        "Ep ${entry.episode}"
-                    }
-                    Text(
-                        text = episodeText,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(2.dp))
-
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    entry.format?.let { fmt ->
-                        Text(
-                            text = fmt.replace("_", " "),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-
-                    entry.averageScore?.let { score ->
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(2.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Star,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.tertiary,
-                                modifier = Modifier.size(12.dp),
-                            )
-                            Text(
-                                text = "${score / 10.0}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.tertiary,
-                            )
-                        }
-                    }
-                }
-            }
+                title = displayTitle,
+                hasAired = hasAired,
+                officialAirTime = officialAirTime,
+                countdown = countdown,
+                expectedUploadTime = expectedUploadTime,
+                episode = entry.episode,
+                totalEpisodes = entry.totalEpisodes,
+                format = entry.format,
+                averageScore = entry.averageScore,
+            )
 
             Spacer(modifier = Modifier.width(2.dp))
 
-            Column(
-                modifier = Modifier.clickable(
-                    indication = null,
-                    interactionSource = remember { MutableInteractionSource() },
-                ) { },
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
+            ScheduleAnimeActions(
+                hasAired = hasAired,
+                isInLibrary = isInLibrary,
+                autoAddFromPinnedSources = autoAddFromPinnedSources,
+                notifyState = notifyState,
+                onSearchClick = { onSearchClick(displayTitle) },
+                onAddToLibraryClick = { onAddToLibraryClick(displayTitle) },
+                onToggleNotifyOnce = onToggleNotifyOnce,
+                onToggleNotifySeries = onToggleNotifySeries,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ScheduleAnimeCover(
+    coverUrl: String?,
+    title: String,
+    isAdult: Boolean,
+) {
+    Box {
+        AsyncImage(
+            model = coverUrl,
+            contentDescription = title,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .size(width = 56.dp, height = 80.dp)
+                .clip(RoundedCornerShape(10.dp)),
+        )
+        if (isAdult) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .clip(RoundedCornerShape(bottomStart = 6.dp))
+                    .background(MaterialTheme.colorScheme.error)
+                    .padding(horizontal = 3.dp, vertical = 1.dp),
             ) {
-                FilledTonalIconButton(
-                    onClick = { onSearchClick(displayTitle) },
-                    modifier = Modifier.size(36.dp),
-                ) {
-                    Icon(
-                        imageVector = if (hasAired) Icons.Outlined.PlayCircle else Icons.Outlined.Search,
-                        contentDescription = if (hasAired) "Watch / Find episode" else "Find in sources",
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
-
-                IconButton(
-                    onClick = { onAddToLibraryClick(displayTitle) },
-                    modifier = Modifier.size(36.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.BookmarkBorder,
-                        contentDescription = if (autoAddFromPinnedSources) "Add to library via pinned source" else "Add to library",
-                        modifier = Modifier.size(18.dp),
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                }
-
-                EpisodeBell(
-                    state = notifyState,
-                    onTap = onToggleNotifyOnce,
-                    onLongPress = onToggleNotifySeries,
+                Text(
+                    text = "18+",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onError,
+                    fontWeight = FontWeight.Bold,
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun ScheduleAnimeInfo(
+    title: String,
+    hasAired: Boolean,
+    officialAirTime: String,
+    countdown: String?,
+    expectedUploadTime: String?,
+    episode: Int,
+    totalEpisodes: Int?,
+    format: String?,
+    averageScore: Int?,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+
+        AirTimeBadgeRow(
+            hasAired = hasAired,
+            officialAirTime = officialAirTime,
+            countdown = countdown,
+            expectedUploadTime = expectedUploadTime,
+            episode = episode,
+            totalEpisodes = totalEpisodes,
+        )
+
+        Spacer(modifier = Modifier.height(2.dp))
+
+        ScheduleAnimeMetaRow(format = format, averageScore = averageScore)
+    }
+}
+
+@Composable
+private fun AirTimeBadgeRow(
+    hasAired: Boolean,
+    officialAirTime: String,
+    countdown: String?,
+    // Kept for source compatibility with callers/settings that compute an estimated
+    // upload time; intentionally not rendered as its own badge anymore, since a 3rd
+    // badge crowded the row and squeezed the episode label into a vertical wrap.
+    expectedUploadTime: String?,
+    episode: Int,
+    totalEpisodes: Int?,
+) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Surface(
+            shape = RoundedCornerShape(6.dp),
+            color = if (hasAired) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
+        ) {
+            Text(
+                text = if (hasAired) "Aired ${expectedUploadTime ?: officialAirTime}" else (expectedUploadTime ?: officialAirTime),
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = if (hasAired) MaterialTheme.colorScheme.onTertiary else MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            )
+        }
+
+        if (!hasAired && countdown != null) {
+            Surface(
+                shape = RoundedCornerShape(6.dp),
+                color = MaterialTheme.colorScheme.errorContainer,
+            ) {
+                Text(
+                    text = "in $countdown",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                )
+            }
+        }
+
+        val episodeText = if (totalEpisodes != null) "Ep $episode / $totalEpisodes" else "Ep $episode"
+        Text(
+            text = episodeText,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier.padding(start = 2.dp),
+        )
+    }
+}
+
+@Composable
+private fun ScheduleAnimeMetaRow(
+    format: String?,
+    averageScore: Int?,
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        format?.let { fmt ->
+            Text(
+                text = fmt.replace("_", " "),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        averageScore?.let { score ->
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Star,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.size(12.dp),
+                )
+                Text(
+                    text = "${score / 10.0}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.tertiary,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ScheduleAnimeActions(
+    hasAired: Boolean,
+    isInLibrary: Boolean,
+    autoAddFromPinnedSources: Boolean,
+    notifyState: BellNotifyState,
+    onSearchClick: () -> Unit,
+    onAddToLibraryClick: () -> Unit,
+    onToggleNotifyOnce: () -> Unit,
+    onToggleNotifySeries: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.clickable(
+            indication = null,
+            interactionSource = remember { MutableInteractionSource() },
+        ) { },
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        FilledTonalIconButton(
+            onClick = onSearchClick,
+            modifier = Modifier.size(36.dp),
+        ) {
+            Icon(
+                imageVector = if (hasAired) Icons.Outlined.PlayCircle else Icons.Outlined.Search,
+                contentDescription = if (hasAired) "Watch / Find episode" else "Find in sources",
+                modifier = Modifier.size(18.dp),
+            )
+        }
+
+        IconButton(
+            onClick = onAddToLibraryClick,
+            modifier = Modifier.size(36.dp),
+        ) {
+            Icon(
+                imageVector = if (isInLibrary) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+                contentDescription = when {
+                    isInLibrary -> "Already in library"
+                    autoAddFromPinnedSources -> "Add to library via pinned source"
+                    else -> "Add to library"
+                },
+                modifier = Modifier.size(18.dp),
+                tint = if (isInLibrary) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        EpisodeBell(
+            state = notifyState,
+            onTap = onToggleNotifyOnce,
+            onLongPress = onToggleNotifySeries,
+        )
     }
 }
 
@@ -298,7 +377,7 @@ private fun formatCountdown(airingAtEpochSeconds: Long): String? {
     val diff = airingAtEpochSeconds - nowSeconds
     if (diff <= 0) return null
     val hours = diff / 3600
-    val minutes = (diff % 3600) / 60
+    val minutes = diff % 3600 / 60
     return when {
         hours >= 24 -> {
             val days = hours / 24
